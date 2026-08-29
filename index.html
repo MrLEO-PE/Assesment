@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PE Auto Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#141C24; --paper:#F5F7F4; --card:#FFFFFF; --line:#DCE1DB; --muted:#69747E;
+  --brand:#243B6B; --brand-2:#33529A; --gold:#B9862B; --warn:#A8401C;
+  --l1:#C9D2CB; --l2:#8FBF9F; --l3:#3F9D6B; --l4:#12603C;
+  --l1t:#3A423C; --l2t:#123322; --l3t:#FFFFFF; --l4t:#FFFFFF;
+  --h-red:#B23A48; --h-yellow:#C4941F; --h-green:#3F9D6B; --h-blue:#2F6FA8;
+  --r:14px; --shadow:0 1px 2px rgba(20,28,36,.06), 0 8px 24px rgba(20,28,36,.06);
+  --display:'Archivo',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--body); background:var(--paper); color:var(--ink);
+  font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3,h4{font-family:var(--display); margin:0; letter-spacing:-.02em; line-height:1.1}
+h1{font-weight:800; font-size:1.55rem}
+h2{font-weight:700; font-size:1.2rem}
+h3{font-weight:700; font-size:1rem}
+button,input,select,textarea{font:inherit; color:inherit}
+button{cursor:pointer}
+a{color:var(--brand-2)}
+.mono{font-family:var(--mono)}
+.hide{display:none !important}
+:focus-visible{outline:3px solid var(--brand-2); outline-offset:2px; border-radius:6px}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1180px; margin:0 auto; padding:14px 14px 40px}
+.topbar{
+  position:sticky; top:0; z-index:40; background:rgba(245,247,244,.92);
+  backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+}
+.topbar-in{max-width:1180px; margin:0 auto; padding:10px 14px; display:flex; align-items:center; gap:12px}
+.brandmark{display:flex; align-items:center; gap:9px; font-family:var(--display); font-weight:800; letter-spacing:-.02em}
+.brandmark .rungs{display:flex; gap:2px; align-items:flex-end; height:20px}
+.brandmark .rungs i{width:5px; border-radius:1px; display:block}
+.brandmark .rungs i:nth-child(1){height:6px;background:var(--l1)}
+.brandmark .rungs i:nth-child(2){height:10px;background:var(--l2)}
+.brandmark .rungs i:nth-child(3){height:15px;background:var(--l3)}
+.brandmark .rungs i:nth-child(4){height:20px;background:var(--l4)}
+.spacer{flex:1}
+.who{font-size:.82rem; color:var(--muted); text-align:right; line-height:1.25}
+.who b{display:block; color:var(--ink); font-size:.9rem}
+
+/* ---------- buttons ---------- */
+.btn{
+  border:1px solid var(--line); background:var(--card); color:var(--ink);
+  padding:10px 14px; border-radius:10px; font-weight:600; font-size:.92rem;
+  display:inline-flex; align-items:center; gap:8px; text-decoration:none;
+}
+.btn:hover{border-color:#c3cbc4}
+.btn.primary{background:var(--brand); border-color:var(--brand); color:#fff}
+.btn.primary:hover{background:var(--brand-2); border-color:var(--brand-2)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:7px 10px; font-size:.84rem; border-radius:9px}
+.btn.danger{color:var(--warn); border-color:#e4c9bd}
+.btn[disabled]{opacity:.45; cursor:not-allowed}
+.btnrow{display:flex; gap:8px; flex-wrap:wrap}
+
+/* ---------- cards ---------- */
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow)}
+.card.pad{padding:16px}
+.grid-cards{display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.eyebrow{font-family:var(--mono); font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.tiny{font-size:.76rem}
+
+/* ---------- login ---------- */
+.auth{max-width:430px; margin:6vh auto; }
+.auth .card{padding:22px}
+.field{display:block; margin:12px 0}
+.field span{display:block; font-size:.8rem; font-weight:600; color:var(--muted); margin-bottom:5px}
+.field input,.field select{
+  width:100%; padding:12px; border:1px solid var(--line); border-radius:10px; background:#fff;
+}
+.tabs{display:flex; gap:6px; background:#EDF0EC; padding:5px; border-radius:12px; margin-bottom:16px}
+.tabs button{flex:1; border:0; background:transparent; padding:9px; border-radius:9px; font-weight:600; font-size:.9rem; color:var(--muted)}
+.tabs button[aria-selected="true"]{background:#fff; color:var(--ink); box-shadow:var(--shadow)}
+.notice{padding:10px 12px; border-radius:10px; font-size:.85rem; margin-top:12px}
+.notice.err{background:#FBEDE7; color:var(--warn)}
+.notice.ok{background:#E9F3ED; color:var(--l4)}
+.notice.info{background:#EDF1F8; color:var(--brand)}
+
+/* ---------- sport list ---------- */
+.sport{display:flex; flex-direction:column; gap:10px; padding:15px; text-align:left; width:100%; border:1px solid var(--line); background:#fff; border-radius:var(--r); box-shadow:var(--shadow)}
+.sport:hover{border-color:var(--brand-2)}
+.sport .name{font-family:var(--display); font-weight:800; font-size:1.15rem}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chip{font-size:.72rem; font-weight:600; padding:4px 8px; border-radius:999px; background:#EDF0EC; color:var(--muted)}
+.chip.open{background:#E9F3ED; color:var(--l4)}
+.chip.done{background:var(--l4); color:#fff}
+.chip.locked{background:#EDF0EC; color:#909A92}
+.chip.gold{background:#F7EFDD; color:var(--gold)}
+
+/* ---------- ladder ---------- */
+.skill{border:1px solid var(--line); border-radius:var(--r); background:#fff; margin-bottom:14px; overflow:hidden; box-shadow:var(--shadow)}
+.skill-head{padding:12px 14px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:flex-start}
+.skill-num{font-family:var(--mono); font-size:.78rem; color:var(--muted); padding-top:2px}
+.skill-type{font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:3px 7px; border-radius:5px; background:#EDF1F8; color:var(--brand); white-space:nowrap}
+.skill-type.social{background:#F7EFDD; color:var(--gold)}
+.skill-type.method{background:#F0EDF6; color:#5B4C8A}
+.rungs{display:grid; grid-template-columns:1fr; gap:0}
+.rung{
+  display:flex; gap:10px; align-items:flex-start; text-align:left;
+  padding:12px 14px; border:0; border-top:1px solid var(--line); background:#fff; width:100%;
+  transition:background .15s ease, color .15s ease;
+}
+.rungs .rung:first-child{border-top:0}
+.rung .lvl{font-family:var(--mono); font-weight:600; font-size:.8rem; width:22px; flex:none; color:var(--muted)}
+.rung .txt{font-size:.9rem}
+.rung:hover:not([disabled]){background:#F2F5F1}
+.rung[aria-pressed="true"]{color:var(--l3t)}
+.rung[aria-pressed="true"] .lvl{color:inherit}
+.rung.lv1[aria-pressed="true"]{background:var(--l1); color:var(--l1t)}
+.rung.lv2[aria-pressed="true"]{background:var(--l2); color:var(--l2t)}
+.rung.lv3[aria-pressed="true"]{background:var(--l3); color:var(--l3t)}
+.rung.lv4[aria-pressed="true"]{background:var(--l4); color:var(--l4t)}
+.rung[disabled]{cursor:default}
+.tmark{
+  margin-left:auto; flex:none; font-family:var(--mono); font-size:.68rem; font-weight:600;
+  border:1.5px solid currentColor; border-radius:6px; padding:1px 5px; opacity:.85;
+}
+@media (min-width:880px){
+  .rungs{grid-template-columns:repeat(4,1fr)}
+  .rung{border-top:0; border-left:1px solid var(--line); flex-direction:column; gap:6px}
+  .rungs .rung:first-child{border-left:0}
+  .rung .tmark{margin-left:0}
+}
+.savebar{
+  position:sticky; bottom:0; z-index:30; background:rgba(245,247,244,.94); backdrop-filter:blur(8px);
+  border-top:1px solid var(--line); padding:12px 14px; display:flex; gap:12px; align-items:center;
+  margin:0 -14px -40px; padding-bottom:calc(12px + env(safe-area-inset-bottom));
+}
+.progressline{flex:1; height:6px; background:#E4E8E3; border-radius:99px; overflow:hidden}
+.progressline i{display:block; height:100%; background:var(--l3); width:0; transition:width .25s ease}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; font-size:.85rem}
+th,td{border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:middle}
+th{background:#EFF2EE; font-weight:600; font-size:.78rem; white-space:nowrap}
+td.num,th.num{text-align:center; font-family:var(--mono)}
+tbody tr:nth-child(even) td{background:#FAFBF9}
+.namecell{white-space:nowrap; font-weight:600}
+select.lvl{
+  width:100%; min-width:56px; padding:4px 6px; border-radius:7px; border:1px solid var(--line);
+  background:#fff; font-family:var(--mono); font-size:.82rem; text-align:center;
+}
+select.lvl[data-v="1"]{background:var(--l1)}
+select.lvl[data-v="2"]{background:var(--l2)}
+select.lvl[data-v="3"]{background:var(--l3); color:#fff}
+select.lvl[data-v="4"]{background:var(--l4); color:#fff}
+.pill{display:inline-block; font-family:var(--mono); font-size:.76rem; padding:2px 7px; border-radius:999px; background:#EDF0EC}
+.pill.hp{background:#E9F3ED; color:var(--l4)}
+.pill.wd{background:#F7EFDD; color:var(--gold)}
+.gap0{color:var(--l4); font-weight:600}
+.gap1{color:var(--muted)}
+.gap2{color:var(--warn); font-weight:600}
+.house-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+
+/* ---------- teacher nav ---------- */
+.tnav{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px}
+.tnav button{border:1px solid var(--line); background:#fff; padding:8px 13px; border-radius:999px; font-weight:600; font-size:.86rem; white-space:nowrap; color:var(--muted)}
+.tnav button[aria-selected="true"]{background:var(--ink); border-color:var(--ink); color:#fff}
+.toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px}
+.toolbar .field{margin:0; min-width:150px}
+.win{display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; background:#fff}
+.switch{position:relative; width:42px; height:24px; flex:none}
+.switch input{opacity:0; width:100%; height:100%; margin:0; cursor:pointer}
+.switch i{position:absolute; inset:0; background:#D5DBD5; border-radius:99px; pointer-events:none; transition:background .2s}
+.switch i::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch input:checked + i{background:var(--l3)}
+.switch input:checked + i::after{transform:translateX(18px)}
+.switch input:focus-visible + i{outline:3px solid var(--brand-2); outline-offset:2px}
+.kpi{display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); margin-bottom:14px}
+.kpi .card{padding:12px}
+.kpi .v{font-family:var(--display); font-weight:800; font-size:1.5rem}
+textarea.csv{width:100%; min-height:120px; padding:11px; border:1px solid var(--line); border-radius:10px; font-family:var(--mono); font-size:.8rem}
+details.help{margin:10px 0; border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px 12px}
+details.help summary{cursor:pointer; font-weight:600; font-size:.88rem}
+details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius:8px; font-size:.76rem}
+.setgrid{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+
+/* ---------- print: A4 landscape ---------- */
+.printhead{display:none}
+@media print{
+  @page{size:A4 landscape; margin:9mm}
+  body{background:#fff; font-size:9.5pt; padding:0}
+  .topbar,.savebar,.tnav,.toolbar,.btn,.btnrow,.noprint,details.help{display:none !important}
+  .wrap{padding:0; max-width:none}
+  .printhead{display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid var(--ink); padding-bottom:4px; margin-bottom:8px}
+  .card,.skill{box-shadow:none; break-inside:avoid; page-break-inside:avoid; margin-bottom:5px}
+  .skill-head{padding:5px 7px}
+  .rungs{grid-template-columns:repeat(4,1fr) !important}
+  .rung{border-top:0 !important; border-left:1px solid var(--line) !important; flex-direction:column !important; gap:3px; padding:6px 7px; font-size:8.5pt}
+  .rungs .rung:first-child{border-left:0 !important}
+  .rung .txt{font-size:8.5pt; line-height:1.25}
+  .rung[aria-pressed="true"]{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  table{font-size:8pt} th,td{padding:3px 4px}
+  select.lvl{border:0; -webkit-appearance:none; appearance:none; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .tablewrap{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brandmark">
+      <span class="rungs" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>Auto&nbsp;Assessment</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="who hide" id="whoBox"><b id="whoName"></b><span id="whoSub"></span></div>
+    <button class="btn sm ghost hide" id="btnLogout">Log out</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============ LOGIN ============ -->
+<section id="scr-login">
+  <div class="auth">
+    <h1 style="margin-bottom:6px">Sign in</h1>
+    <p class="muted small" style="margin-top:0">Assess your skills, climb the levels, earn house points.</p>
+    <div class="card pad">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabStudent" aria-selected="true">Student</button>
+        <button role="tab" id="tabTeacher" aria-selected="false">Teacher</button>
+      </div>
+
+      <form id="formStudent">
+        <label class="field"><span>Student ID</span><input id="sCode" autocomplete="username" placeholder="e.g. S8A01" required></label>
+        <label class="field"><span>PIN</span><input id="sPin" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="4 digits" required></label>
+        <button class="btn primary" style="width:100%; justify-content:center" type="submit">Sign in</button>
+      </form>
+
+      <form id="formTeacher" class="hide">
+        <label class="field"><span>Email</span><input id="tEmail" type="email" autocomplete="username" required></label>
+        <label class="field"><span>Password</span><input id="tPass" type="password" autocomplete="current-password" required></label>
+        <button class="btn primary" style="width:100%; justify-content:center" type="submit">Sign in</button>
+      </form>
+
+      <div id="loginMsg"></div>
+      <div id="demoHint" class="notice info hide"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONFIRM CLASS ============ -->
+<section id="scr-confirm" class="hide">
+  <div class="auth">
+    <h1>Is this your class?</h1>
+    <div class="card pad">
+      <p class="muted small" style="margin-top:0">Check it before you start. Your marks are saved to this class.</p>
+      <label class="field"><span>Class</span><select id="confirmClass"></select></label>
+      <button class="btn primary" id="btnConfirmClass" style="width:100%; justify-content:center">That's my class</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STUDENT HOME ============ -->
+<section id="scr-shome" class="hide">
+  <h1 id="sHomeTitle">Your sports</h1>
+  <p class="muted small" style="margin-top:4px" id="sHomeSub"></p>
+  <div class="kpi" id="sKpi"></div>
+  <div class="grid-cards" id="sportList"></div>
+</section>
+
+<!-- ============ STUDENT GRID ============ -->
+<section id="scr-sgrid" class="hide">
+  <div class="btnrow noprint" style="margin-bottom:12px">
+    <button class="btn sm" id="btnBackHome">&larr; Sports</button>
+    <button class="btn sm" id="btnPrintSelf">Print</button>
+  </div>
+  <div class="printhead"><h2 id="printTitle"></h2><span class="mono small" id="printWho"></span></div>
+  <h1 id="gridTitle"></h1>
+  <div class="tabs noprint" style="max-width:420px; margin-top:12px" role="tablist">
+    <button role="tab" id="phaseSelf1" aria-selected="true">Lesson 1</button>
+    <button role="tab" id="phaseSelf2" aria-selected="false">Final lesson</button>
+  </div>
+  <div id="phaseMsg"></div>
+  <div id="ladders" style="margin-top:14px"></div>
+  <div class="savebar noprint" id="saveBar">
+    <div class="progressline"><i id="progFill"></i></div>
+    <span class="mono small" id="progText">0 / 5</span>
+    <button class="btn primary" id="btnSaveSelf">Save</button>
+  </div>
+</section>
+
+<!-- ============ TEACHER ============ -->
+<section id="scr-teacher" class="hide">
+  <nav class="tnav" id="tnav">
+    <button data-t="marks" aria-selected="true">Class marks</button>
+    <button data-t="windows" aria-selected="false">Windows</button>
+    <button data-t="awards" aria-selected="false">House &amp; Well Done points</button>
+    <button data-t="grids" aria-selected="false">Assessment grids</button>
+    <button data-t="programme" aria-selected="false">Programme</button>
+    <button data-t="students" aria-selected="false">Students</button>
+    <button data-t="settings" aria-selected="false">Settings</button>
+  </nav>
+
+  <!-- marks -->
+  <div id="t-marks">
+    <div class="toolbar">
+      <label class="field"><span>Class</span><select id="mClass"></select></label>
+      <label class="field"><span>Sport</span><select id="mSport"></select></label>
+      <button class="btn sm" id="btnPrintClass">Print overview</button>
+      <button class="btn sm" id="btnExportMarks">Export CSV</button>
+    </div>
+    <div class="printhead"><h2 id="mPrintTitle"></h2><span class="mono small" id="mPrintDate"></span></div>
+    <div class="card" style="padding:12px">
+      <div class="tablewrap" id="marksTable"></div>
+      <p class="tiny muted" style="margin:10px 0 0">
+        S1 / S2 = student self-assessment (lesson 1, final). T1 / T2 / T3 = your marks (first, mid, final).
+        <b>Gap</b> = how far the student's final self-assessment sits from your final mark, across the 5 skills.
+      </p>
+    </div>
+  </div>
+
+  <!-- windows -->
+  <div id="t-windows" class="hide">
+    <div class="toolbar">
+      <label class="field"><span>Class</span><select id="wClass"></select></label>
+      <label class="field"><span>Sport</span><select id="wSport"></select></label>
+    </div>
+    <div class="card pad">
+      <h3>Open a phase to let students save</h3>
+      <p class="muted small">Students can only record or change a self-assessment while its window is open. Your own marks are never locked.</p>
+      <div class="grid-cards" id="winList" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- awards -->
+  <div id="t-awards" class="hide">
+    <div class="toolbar">
+      <label class="field"><span>Class</span><select id="aClass"></select></label>
+      <label class="field"><span>Sport</span><select id="aSport"></select></label>
+      <button class="btn sm" id="btnExportAwards">Export CSV</button>
+      <button class="btn primary sm" id="btnIssue">Issue points to class</button>
+    </div>
+    <div id="awardMsg"></div>
+    <div class="card" style="padding:12px; margin-top:12px">
+      <div class="tablewrap" id="awardTable"></div>
+      <p class="tiny muted" style="margin:10px 0 0" id="awardRule"></p>
+    </div>
+  </div>
+
+  <!-- grids -->
+  <div id="t-grids" class="hide">
+    <div class="toolbar">
+      <label class="field"><span>Grid</span><select id="gSelect"></select></label>
+      <button class="btn sm" id="btnPrintGrid">Print blank grid</button>
+      <button class="btn sm danger" id="btnDeleteGrid">Delete grid</button>
+    </div>
+    <div class="printhead"><h2 id="gPrintTitle"></h2><span class="mono small">Levels 1&ndash;4</span></div>
+    <div id="gridEditor"></div>
+    <details class="help noprint">
+      <summary>Import a grid from CSV</summary>
+      <p class="small muted">One row per skill, 5 rows per grid. Header row required.</p>
+      <pre>sport,year_group,skill_index,type,skill_name,criteria,level1,level2,level3,level4</pre>
+      <textarea class="csv" id="csvGrid" placeholder="Paste CSV here, or use the file picker below"></textarea>
+      <div class="btnrow" style="margin-top:8px">
+        <input type="file" id="fileGrid" accept=".csv" class="btn sm">
+        <button class="btn primary sm" id="btnImportGrid">Import grid CSV</button>
+        <button class="btn sm" id="btnTplGrid">Download template</button>
+      </div>
+      <div id="gridMsg"></div>
+    </details>
+  </div>
+
+  <!-- programme -->
+  <div id="t-programme" class="hide">
+    <div class="card pad">
+      <h3>Year group programme</h3>
+      <p class="muted small">This is the sport list each year group sees. Import it or add sports one at a time.</p>
+      <div class="toolbar" style="margin-top:12px">
+        <label class="field"><span>Year</span><select id="pYear"></select></label>
+        <label class="field"><span>Sport</span><input id="pSport" placeholder="e.g. Basketball"></label>
+        <label class="field"><span>Term</span><input id="pTerm" placeholder="e.g. Term 1"></label>
+        <button class="btn primary sm" id="btnAddProg">Add sport</button>
+      </div>
+      <div class="tablewrap" id="progTable"></div>
+      <details class="help">
+        <summary>Import programme from CSV</summary>
+        <pre>year_group,sport,term</pre>
+        <textarea class="csv" id="csvProg"></textarea>
+        <div class="btnrow" style="margin-top:8px">
+          <input type="file" id="fileProg" accept=".csv" class="btn sm">
+          <button class="btn primary sm" id="btnImportProg">Import programme</button>
+        </div>
+        <div id="progMsg"></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- students -->
+  <div id="t-students" class="hide">
+    <div class="card pad">
+      <h3>Students</h3>
+      <div class="toolbar" style="margin-top:12px">
+        <label class="field"><span>Class</span><select id="stClass"></select></label>
+        <button class="btn sm" id="btnResetPins">Reset PINs for this class</button>
+        <button class="btn sm" id="btnExportStudents">Export CSV</button>
+      </div>
+      <div class="tablewrap" id="studentTable"></div>
+      <details class="help">
+        <summary>Import students from CSV</summary>
+        <pre>code,full_name,class_name,year_group,house,pin</pre>
+        <textarea class="csv" id="csvStudents"></textarea>
+        <div class="btnrow" style="margin-top:8px">
+          <input type="file" id="fileStudents" accept=".csv" class="btn sm">
+          <button class="btn primary sm" id="btnImportStudents">Import students</button>
+        </div>
+        <div id="studentMsg"></div>
+      </details>
+    </div>
+  </div>
+
+  <!-- settings -->
+  <div id="t-settings" class="hide">
+    <div class="card pad">
+      <h3>Points</h3>
+      <p class="muted small">Change any number at any time. New values apply the next time points are issued.</p>
+      <div class="setgrid" style="margin-top:12px">
+        <label class="field"><span>Level 1 is worth</span><input type="number" id="setL1" min="0"></label>
+        <label class="field"><span>Level 2 is worth</span><input type="number" id="setL2" min="0"></label>
+        <label class="field"><span>Level 3 is worth</span><input type="number" id="setL3" min="0"></label>
+        <label class="field"><span>Level 4 is worth</span><input type="number" id="setL4" min="0"></label>
+        <label class="field"><span>Per self-assessment completed</span><input type="number" id="setSelfBonus" min="0"></label>
+        <label class="field"><span>Per level gained (T1 &rarr; T3)</span><input type="number" id="setProgBonus" min="0"></label>
+        <label class="field"><span>Honesty bonus (all 5 within 1 level)</span><input type="number" id="setHonesty" min="0"></label>
+        <label class="field"><span>House points per Well Done point</span><input type="number" id="setWd" min="1"></label>
+      </div>
+      <div class="btnrow" style="margin-top:6px">
+        <button class="btn primary" id="btnSaveSettings">Save settings</button>
+      </div>
+      <div id="setMsg"></div>
+      <hr style="border:0; border-top:1px solid var(--line); margin:18px 0">
+      <h3>Data</h3>
+      <p class="muted small" id="modeLine"></p>
+      <div class="btnrow"><button class="btn sm danger" id="btnResetDemo">Reset demo data</button></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ============================================================
+   PE AUTO ASSESSMENT  —  configuration
+   Fill these two lines with the SAME Supabase project as the
+   PE Programme Planner. Leave them empty to run in demo mode
+   (data stays in this browser only).
+   ============================================================ */
+const CONFIG = {
+  SUPABASE_URL: '',
+  SUPABASE_ANON_KEY: ''
+};
+
+/* ---------- tiny helpers ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const show = id => { $$('main > section').forEach(x => x.classList.add('hide')); $(id).classList.remove('hide'); window.scrollTo(0,0); };
+const msg = (box, text, kind='info') => { const b=$(box); b.innerHTML = text ? `<div class="notice ${kind}">${esc(text)}</div>` : ''; };
+const uniq = a => Array.from(new Set(a));
+const PHASES = { self1:'Lesson 1 (student)', self2:'Final lesson (student)', t1:'First lesson (teacher)', t2:'Mid unit (teacher)', t3:'Final lesson (teacher)' };
+const HOUSE_COLOR = h => /red/i.test(h)?'var(--h-red)':/yellow/i.test(h)?'var(--h-yellow)':/green/i.test(h)?'var(--h-green)':/blue/i.test(h)?'var(--h-blue)':'#9AA5A0';
+const MEM = {};
+const LS_OK = (() => { try { localStorage.setItem('aa::probe','1'); localStorage.removeItem('aa::probe'); return true; } catch { return false; } })();
+const store = {
+  get: k => { try { return LS_OK ? localStorage.getItem(k) : (MEM[k] ?? null); } catch { return MEM[k] ?? null; } },
+  set: (k, v) => { try { LS_OK ? localStorage.setItem(k, v) : (MEM[k] = v); } catch { MEM[k] = v; } }
+};
+const T = { settings:'aa_settings', students:'aa_students', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', windows:'aa_windows', marks:'aa_marks', awards:'aa_awards' };
+
+/* ============================================================
+   DATA LAYER — same API for Supabase and for demo mode
+   ============================================================ */
+const DB = {
+  mode: 'demo',
+  sb: null,
+  async init(){
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY){
+      const m = await import('https://esm.sh/@supabase/supabase-js@2');
+      this.sb = m.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      this.mode = 'supabase';
+    } else {
+      seedDemo();
+    }
+  },
+  _ls(t){ try { return JSON.parse(store.get('aa::'+t) || '[]'); } catch { return []; } },
+  _save(t, rows){ store.set('aa::'+t, JSON.stringify(rows)); },
+  async select(table, match, cols){
+    if (this.mode === 'supabase'){
+      let q = this.sb.from(table).select(cols || '*');
+      if (match) for (const k in match){ q = Array.isArray(match[k]) ? q.in(k, match[k]) : q.eq(k, match[k]); }
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+    let rows = this._ls(table);
+    if (match) rows = rows.filter(r => Object.keys(match).every(k => Array.isArray(match[k]) ? match[k].includes(r[k]) : r[k] === match[k]));
+    return JSON.parse(JSON.stringify(rows));
+  },
+  async upsert(table, rows, keys){
+    rows = Array.isArray(rows) ? rows : [rows];
+    if (!rows.length) return [];
+    if (this.mode === 'supabase'){
+      const opts = keys && keys.length ? { onConflict: keys.join(',') } : undefined;
+      const { data, error } = await this.sb.from(table).upsert(rows, opts).select();
+      if (error) throw error;
+      return data;
+    }
+    const all = this._ls(table);
+    for (const row of rows){
+      let i = -1;
+      if (row.id != null) i = all.findIndex(r => r.id === row.id);
+      if (i < 0 && keys && keys.length) i = all.findIndex(r => keys.every(k => r[k] === row[k]));
+      if (i >= 0) all[i] = { ...all[i], ...row };
+      else all.push({ id: Date.now() + Math.floor(Math.random()*100000), ...row });
+    }
+    this._save(table, all);
+    return rows;
+  },
+  async update(table, match, patch){
+    if (this.mode === 'supabase'){
+      let q = this.sb.from(table).update(patch);
+      for (const k in match) q = q.eq(k, match[k]);
+      const { error } = await q; if (error) throw error; return;
+    }
+    const all = this._ls(table);
+    all.forEach((r, i) => { if (Object.keys(match).every(k => r[k] === match[k])) all[i] = { ...r, ...patch }; });
+    this._save(table, all);
+  },
+  async remove(table, match){
+    if (this.mode === 'supabase'){
+      let q = this.sb.from(table).delete();
+      for (const k in match) q = q.eq(k, match[k]);
+      const { error } = await q; if (error) throw error; return;
+    }
+    const keep = this._ls(table).filter(r => !Object.keys(match).every(k => r[k] === match[k]));
+    this._save(table, keep);
+  }
+};
+
+/* ---------- app state ---------- */
+const S = {
+  settings: null, user: null, role: null,
+  students: [], programme: [], grids: [], skills: [], windows: [], marks: [], awards: [],
+  sport: null, grid: null, phase: 'self1', draft: {}
+};
+const STUDENT_COLS = 'id,code,full_name,class_name,year_group,house,wd_carry';
+const DEFAULT_SETTINGS = { l1:1, l2:2, l3:5, l4:10, selfBonus:5, progBonus:2, honesty:5, hpPerWd:15 };
+const lvlPoints = l => [0, S.settings.l1, S.settings.l2, S.settings.l3, S.settings.l4][l] || 0;
+
+/* ============================================================
+   DEMO SEED
+   ============================================================ */
+function seedDemo(force){
+  if (!force && store.get('aa::seeded')) return;
+  const students = [
+    ['S8A01','Amara Diallo','8A',8,'Red Dragon'], ['S8A02','Ben Kovac','8A',8,'Blue Phoenix'],
+    ['S8A03','Chloe Marchand','8A',8,'Green Griffins'], ['S8A04','Daniel Osei','8A',8,'Yellow Yetis'],
+    ['S8A05','Elif Yilmaz','8A',8,'Red Dragon'], ['S8A06','Farid Haddad','8A',8,'Blue Phoenix'],
+    ['S8A07','Grace Nkemi','8A',8,'Green Griffins'], ['S8A08','Hugo Lefevre','8A',8,'Yellow Yetis'],
+    ['S8B01','Ines Ferrer','8B',8,'Red Dragon'], ['S8B02','Jonas Weber','8B',8,'Blue Phoenix'],
+    ['S7A01','Kaya Tanaka','7A',7,'Green Griffins'], ['S7A02','Liam Byrne','7A',7,'Yellow Yetis']
+  ].map(([code,full_name,class_name,year_group,house], i) => ({ id:100+i, code, full_name, class_name, year_group, house, pin:'1234', wd_carry:0 }));
+
+  const programme = [
+    [8,'Basketball','Term 1'], [8,'Gymnastics','Term 2'], [8,'Touch Rugby','Term 2'], [8,'Athletics','Term 3'],
+    [7,'Gymnastics','Term 1'], [7,'Dance','Term 2'], [7,'Athletics','Term 3']
+  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, sport, term, sort:i }));
+
+  const grids = [{ id:300, sport:'Basketball', year_group:8, title:'Basketball — Year 8' }];
+  const sk = [
+    ['motor','Ball handling under pressure','Keeps the ball while moving',
+      'Loses control when moving and stops to look down at the ball.',
+      'Dribbles with the strong hand while moving, head up in short bursts.',
+      'Dribbles with both hands, head up, protects the ball under light pressure.',
+      'Changes hand, speed and direction under real pressure and keeps the ball alive.'],
+    ['motor','Shooting','Scores from a realistic position',
+      'Throws at the basket with no set position; rarely reaches the rim.',
+      'Correct hand position; scores from close range when nobody defends.',
+      'Scores a lay-up on the strong side and a set shot from the key.',
+      'Chooses the right shot for the situation and scores under pressure.'],
+    ['motor','Moving without the ball','Creates and closes space',
+      'Stands still and waits for the ball; follows the ball as a group.',
+      'Moves into space after passing, but only near the ball.',
+      'Creates a passing line, marks an opponent, stays between player and basket.',
+      'Reads the game: cuts, screens and switches marking to help a team-mate.'],
+    ['method','Preparing my own practice','Ready, safe and self-reliant',
+      'Arrives without kit and waits to be told everything.',
+      'Ready on time; joins the warm-up when reminded.',
+      'Ready on time in kit, warms up properly, checks the space and equipment.',
+      'Leads part of the warm-up, adapts a drill to their level, sets up and packs away.'],
+    ['social','Refereeing and team roles','Takes a role for the group',
+      'Watches without taking a role.',
+      'Keeps score or times the game with help.',
+      'Referees a small-sided game: travel, double dribble, fouls, restarts.',
+      'Referees confidently, explains decisions calmly and coaches team-mates.']
+  ].map((r, i) => ({ id:400+i, grid_id:300, idx:i+1, type:r[0], name:r[1], criteria:r[2], d1:r[3], d2:r[4], d3:r[5], d4:r[6] }));
+
+  const windows = [
+    { id:500, class_name:'8A', sport:'Basketball', phase:'self1', is_open:true },
+    { id:501, class_name:'8A', sport:'Basketball', phase:'self2', is_open:false }
+  ];
+  const marks = [];
+  let mid = 600;
+  const t1 = { 100:[1,2,1,2,1], 101:[2,2,2,3,2], 102:[3,3,2,3,3], 103:[2,1,2,2,2], 104:[3,2,3,3,2], 105:[1,1,2,2,1], 106:[2,3,3,3,3], 107:[3,3,3,4,3] };
+  const s1 = { 100:[2,2,2,3,2], 101:[3,3,3,3,3], 102:[3,3,3,3,3], 103:[4,3,4,3,4], 104:[3,2,3,3,3] };
+  for (const sid in t1) t1[sid].forEach((l, i) => marks.push({ id:mid++, student_id:+sid, grid_id:300, phase:'t1', skill_idx:i+1, level:l }));
+  for (const sid in s1) s1[sid].forEach((l, i) => marks.push({ id:mid++, student_id:+sid, grid_id:300, phase:'self1', skill_idx:i+1, level:l }));
+
+  DB._save(T.students, students); DB._save(T.programme, programme); DB._save(T.grids, grids);
+  DB._save(T.skills, sk); DB._save(T.windows, windows); DB._save(T.marks, marks); DB._save(T.awards, []);
+  DB._save(T.settings, [{ id:1, data: DEFAULT_SETTINGS }]);
+  store.set('aa::seeded', '1');
+}
+
+/* ============================================================
+   LOAD
+   ============================================================ */
+async function loadCore(){
+  const [settings, students, programme, grids, skills, windows, awards] = await Promise.all([
+    DB.select(T.settings), DB.select(T.students, null, S.role === 'teacher' ? '*' : STUDENT_COLS), DB.select(T.programme),
+    DB.select(T.grids), DB.select(T.skills), DB.select(T.windows),
+    S.role === 'teacher' ? Promise.resolve([]) : DB.select(T.awards, { student_id: S.user.id })
+  ]);
+  S.settings = { ...DEFAULT_SETTINGS, ...((settings[0] && settings[0].data) || {}) };
+  S.students = students; S.programme = programme; S.grids = grids;
+  S.skills = skills; S.windows = windows; S.awards = awards;
+}
+const gridFor = (sport, year) => S.grids.find(g => g.sport === sport && +g.year_group === +year) || null;
+const skillsOf = gid => S.skills.filter(s => s.grid_id === gid).sort((a,b) => a.idx - b.idx);
+const winOpen = (cls, sport, phase) => { const w = S.windows.find(w => w.class_name === cls && w.sport === sport && w.phase === phase); return !!(w && w.is_open); };
+const markOf = (sid, gid, phase, idx) => S.marks.find(m => m.student_id === sid && m.grid_id === gid && m.phase === phase && m.skill_idx === idx);
+async function loadMarks(gid, ids){
+  if (!gid || !ids.length) return;
+  const rows = await DB.select(T.marks, { grid_id: gid, student_id: ids });
+  S.marks = S.marks.filter(m => !(String(m.grid_id) === String(gid) && ids.includes(m.student_id))).concat(rows);
+}
+async function loadAwards(gid, ids){
+  if (!gid || !ids.length) return;
+  const rows = await DB.select(T.awards, { grid_id: gid, student_id: ids });
+  S.awards = S.awards.filter(a => !(String(a.grid_id) === String(gid) && ids.includes(a.student_id))).concat(rows);
+}
+const phaseDone = (sid, gid, phase) => S.marks.filter(m => m.student_id === sid && m.grid_id === gid && m.phase === phase && m.level).length === 5;
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+$('#tabStudent').onclick = () => { $('#tabStudent').setAttribute('aria-selected','true'); $('#tabTeacher').setAttribute('aria-selected','false'); $('#formStudent').classList.remove('hide'); $('#formTeacher').classList.add('hide'); msg('#loginMsg',''); };
+$('#tabTeacher').onclick = () => { $('#tabTeacher').setAttribute('aria-selected','true'); $('#tabStudent').setAttribute('aria-selected','false'); $('#formTeacher').classList.remove('hide'); $('#formStudent').classList.add('hide'); msg('#loginMsg',''); };
+
+$('#formStudent').onsubmit = e => { e.preventDefault(); studentLogin($('#sCode').value.trim().toUpperCase(), $('#sPin').value.trim()); };
+async function studentLogin(code, pin){
+  let me = null;
+  if (DB.mode === 'supabase'){
+    const { data, error } = await DB.sb.rpc('aa_login', { p_code: code, p_pin: pin });
+    if (error) return msg('#loginMsg', 'Sign-in failed: ' + error.message, 'err');
+    me = (data || [])[0];
+    if (!me) return msg('#loginMsg', 'That ID and PIN do not match. Your teacher can reset your PIN.', 'err');
+  } else {
+    const rows = await DB.select(T.students, { code });
+    if (!rows.length) return msg('#loginMsg', 'No student found with that ID. Check it with your teacher.', 'err');
+    if (String(rows[0].pin) !== pin) return msg('#loginMsg', 'Wrong PIN. Your teacher can reset it.', 'err');
+    me = rows[0];
+  }
+  S.user = me; S.role = 'student';
+  await loadCore();
+  S.user = S.students.find(s => s.id === S.user.id) || S.user;
+  S.marks = await DB.select(T.marks, { student_id: S.user.id });
+  headerFor(S.user.full_name, `${S.user.class_name} · ${S.user.house}`);
+  renderConfirm();
+}
+
+$('#formTeacher').onsubmit = e => { e.preventDefault(); teacherLogin($('#tEmail').value.trim(), $('#tPass').value); };
+async function teacherLogin(email, pass){
+  if (DB.mode === 'supabase'){
+    const { data, error } = await DB.sb.auth.signInWithPassword({ email, password: pass });
+    if (error) return msg('#loginMsg', 'Sign-in failed: ' + error.message, 'err');
+    S.user = data.user;
+  } else {
+    if (pass !== 'pe2026') return msg('#loginMsg', 'Demo teacher password is pe2026.', 'err');
+    S.user = { email: email || 'teacher@demo' };
+  }
+  S.role = 'teacher';
+  await loadCore();
+  S.marks = [];
+  headerFor('Teacher', S.user.email || '');
+  openTeacher();
+}
+
+function headerFor(name, sub){
+  $('#whoBox').classList.remove('hide'); $('#btnLogout').classList.remove('hide');
+  $('#whoName').textContent = name; $('#whoSub').textContent = sub;
+}
+$('#btnLogout').onclick = async () => {
+  if (DB.mode === 'supabase' && S.role === 'teacher') await DB.sb.auth.signOut();
+  S.user = null; S.role = null;
+  $('#whoBox').classList.add('hide'); $('#btnLogout').classList.add('hide');
+  $('#sPin').value = ''; $('#tPass').value = '';
+  show('#scr-login');
+};
+
+/* ============================================================
+   STUDENT — confirm class
+   ============================================================ */
+function renderConfirm(){
+  const classes = uniq(S.students.map(s => s.class_name)).sort();
+  $('#confirmClass').innerHTML = classes.map(c => `<option ${c === S.user.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  show('#scr-confirm');
+}
+$('#btnConfirmClass').onclick = async () => {
+  const cls = $('#confirmClass').value;
+  if (cls !== S.user.class_name){
+    const yr = (S.students.find(s => s.class_name === cls) || {}).year_group || S.user.year_group;
+    await DB.update(T.students, { id: S.user.id }, { class_name: cls, year_group: yr });
+    S.user.class_name = cls; S.user.year_group = yr;
+    headerFor(S.user.full_name, `${cls} · ${S.user.house}`);
+  }
+  renderStudentHome();
+};
+
+/* ============================================================
+   STUDENT — home
+   ============================================================ */
+function renderStudentHome(){
+  $('#sHomeTitle').textContent = `Hi ${S.user.full_name.split(' ')[0]}`;
+  $('#sHomeSub').textContent = `Year ${S.user.year_group} · ${S.user.class_name} · ${S.user.house}`;
+  const mine = S.awards.filter(a => a.student_id === S.user.id);
+  const hp = mine.reduce((n,a) => n + (a.hp||0), 0), wd = mine.reduce((n,a) => n + (a.wd||0), 0);
+  $('#sKpi').innerHTML = `
+    <div class="card"><div class="eyebrow">House points</div><div class="v" style="color:var(--l4)">${hp}</div></div>
+    <div class="card"><div class="eyebrow">Well Done points</div><div class="v" style="color:var(--gold)">${wd}</div></div>
+    <div class="card"><div class="eyebrow">Towards next</div><div class="v mono">${(S.user.wd_carry||0)}/${S.settings.hpPerWd}</div></div>`;
+
+  const list = S.programme.filter(p => +p.year_group === +S.user.year_group).sort((a,b) => (a.sort||0) - (b.sort||0));
+  if (!list.length){ $('#sportList').innerHTML = `<p class="muted">No sports set for Year ${esc(S.user.year_group)} yet. Your teacher adds them in the programme.</p>`; return; }
+  $('#sportList').innerHTML = list.map(p => {
+    const g = gridFor(p.sport, S.user.year_group);
+    const st = ph => !g ? '<span class="chip">No grid yet</span>'
+      : phaseDone(S.user.id, g.id, ph) ? `<span class="chip done">${ph === 'self1' ? 'Lesson 1' : 'Final'} done</span>`
+      : winOpen(S.user.class_name, p.sport, ph) ? `<span class="chip open">${ph === 'self1' ? 'Lesson 1' : 'Final'} open</span>`
+      : `<span class="chip locked">${ph === 'self1' ? 'Lesson 1' : 'Final'} closed</span>`;
+    const earned = S.awards.filter(a => a.student_id === S.user.id && g && a.grid_id === g.id).reduce((n,a) => n + (a.hp||0), 0);
+    return `<button class="sport" data-sport="${esc(p.sport)}" ${g ? '' : 'disabled'}>
+      <span class="eyebrow">${esc(p.term || '')}</span>
+      <span class="name">${esc(p.sport)}</span>
+      <span class="chips">${st('self1')}${st('self2')}${earned ? `<span class="chip gold">${earned} HP</span>` : ''}</span>
+    </button>`;
+  }).join('');
+  $$('#sportList .sport').forEach(b => b.onclick = () => openStudentGrid(b.dataset.sport));
+  show('#scr-shome');
+}
+$('#btnBackHome').onclick = () => renderStudentHome();
+$('#btnPrintSelf').onclick = () => window.print();
+
+/* ============================================================
+   STUDENT — ladders
+   ============================================================ */
+function openStudentGrid(sport){
+  S.sport = sport; S.grid = gridFor(sport, S.user.year_group);
+  const s2 = winOpen(S.user.class_name, sport, 'self2') || phaseDone(S.user.id, S.grid.id, 'self2');
+  S.phase = s2 ? 'self2' : 'self1';
+  setPhaseTab(); renderLadders(); show('#scr-sgrid');
+}
+function setPhaseTab(){
+  $('#phaseSelf1').setAttribute('aria-selected', S.phase === 'self1');
+  $('#phaseSelf2').setAttribute('aria-selected', S.phase === 'self2');
+}
+$('#phaseSelf1').onclick = () => { S.phase = 'self1'; setPhaseTab(); renderLadders(); };
+$('#phaseSelf2').onclick = () => { S.phase = 'self2'; setPhaseTab(); renderLadders(); };
+
+function renderLadders(){
+  const g = S.grid, sk = skillsOf(g.id);
+  const open = winOpen(S.user.class_name, S.sport, S.phase);
+  const saved = phaseDone(S.user.id, g.id, S.phase);
+  $('#gridTitle').textContent = g.title || `${g.sport} — Year ${g.year_group}`;
+  $('#printTitle').textContent = g.title || g.sport;
+  $('#printWho').textContent = `${S.user.full_name} · ${S.user.class_name}`;
+
+  S.draft = {};
+  sk.forEach(s => { const m = markOf(S.user.id, g.id, S.phase, s.idx); if (m) S.draft[s.idx] = m.level; });
+
+  msg('#phaseMsg', open ? (saved ? 'Saved. You can still change it while this window is open.' : 'Tap the description that sounds most like you, for each of the 5 skills.')
+    : (saved ? 'This window is closed. Your marks are saved.' : 'Your teacher has not opened this window yet.'),
+    open ? (saved ? 'ok' : 'info') : 'info');
+
+  const reveal = saved;
+  $('#ladders').innerHTML = sk.map(s => {
+    const tm = ['t1','t2','t3'].map(p => ({ p, m: markOf(S.user.id, g.id, p, s.idx) })).filter(x => x.m);
+    return `<div class="skill">
+      <div class="skill-head">
+        <span class="skill-num">${s.idx}</span>
+        <span class="skill-type ${s.type === 'social' ? 'social' : s.type === 'method' ? 'method' : ''}">${s.type === 'method' ? 'Method' : s.type === 'social' ? 'Social' : 'Motor'}</span>
+        <span><b>${esc(s.name)}</b><br><span class="muted small">${esc(s.criteria || '')}</span></span>
+      </div>
+      <div class="rungs" data-idx="${s.idx}">
+        ${[1,2,3,4].map(l => {
+          const t = reveal ? tm.filter(x => x.m.level === l).map(x => x.p.toUpperCase()).join(' ') : '';
+          return `<button class="rung lv${l}" data-l="${l}" aria-pressed="${S.draft[s.idx] === l}" ${open ? '' : 'disabled'}>
+            <span class="lvl">${l}</span><span class="txt">${esc(s['d'+l] || '')}</span>
+            ${t ? `<span class="tmark">${t}</span>` : ''}</button>`;
+        }).join('')}
+      </div></div>`;
+  }).join('');
+
+  $$('#ladders .rung').forEach(b => b.onclick = () => {
+    const idx = +b.closest('.rungs').dataset.idx;
+    S.draft[idx] = +b.dataset.l;
+    b.closest('.rungs').querySelectorAll('.rung').forEach(x => x.setAttribute('aria-pressed', x === b));
+    updateProgress();
+  });
+  $('#saveBar').classList.toggle('hide', !open);
+  updateProgress();
+}
+function updateProgress(){
+  const n = Object.keys(S.draft).length;
+  $('#progFill').style.width = (n/5*100) + '%';
+  $('#progText').textContent = `${n} / 5`;
+  $('#btnSaveSelf').disabled = n < 5;
+}
+$('#btnSaveSelf').onclick = async () => {
+  const g = S.grid;
+  const rows = Object.keys(S.draft).map(idx => {
+    const ex = markOf(S.user.id, g.id, S.phase, +idx);
+    return { ...(ex ? { id: ex.id } : {}), student_id: S.user.id, grid_id: g.id, phase: S.phase, skill_idx: +idx, level: S.draft[idx] };
+  });
+  await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
+  S.marks = await DB.select(T.marks, { student_id: S.user.id });
+  renderLadders();
+  msg('#phaseMsg', 'Saved. Your teacher can see it now.', 'ok');
+};
+
+/* ============================================================
+   TEACHER
+   ============================================================ */
+function openTeacher(){
+  fillClassSelects(); fillYearSelect(); fillGridSelect();
+  switchTab('marks'); show('#scr-teacher');
+}
+$('#tnav').onclick = e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.t); };
+function switchTab(t){
+  $$('#tnav button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
+  ['marks','windows','awards','grids','programme','students','settings'].forEach(k => $('#t-'+k).classList.toggle('hide', k !== t));
+  ({ marks:renderMarks, windows:renderWindows, awards:renderAwards, grids:renderGridEditor, programme:renderProgramme, students:renderStudents, settings:renderSettings }[t])();
+}
+function fillClassSelects(){
+  const classes = uniq(S.students.map(s => s.class_name)).sort();
+  ['#mClass','#wClass','#aClass','#stClass'].forEach(sel => {
+    const cur = $(sel).value;
+    $(sel).innerHTML = classes.map(c => `<option>${esc(c)}</option>`).join('');
+    if (classes.includes(cur)) $(sel).value = cur;
+  });
+  ['#mClass','#wClass','#aClass'].forEach(sel => $(sel).onchange = () => { fillSportSelect(sel, sel.replace('Class','Sport')); rerender(); });
+  $('#stClass').onchange = renderStudents;
+  ['#mSport','#wSport','#aSport'].forEach(sel => $(sel).onchange = rerender);
+  fillSportSelect('#mClass','#mSport'); fillSportSelect('#wClass','#wSport'); fillSportSelect('#aClass','#aSport');
+}
+function rerender(){ const t = $('#tnav button[aria-selected="true"]').dataset.t; ({ marks:renderMarks, windows:renderWindows, awards:renderAwards }[t] || (()=>{}))(); }
+function fillSportSelect(clsSel, sportSel){
+  const cls = $(clsSel).value;
+  const yr = (S.students.find(s => s.class_name === cls) || {}).year_group;
+  const sports = S.programme.filter(p => +p.year_group === +yr).sort((a,b) => (a.sort||0)-(b.sort||0)).map(p => p.sport);
+  const cur = $(sportSel).value;
+  $(sportSel).innerHTML = sports.map(s => `<option>${esc(s)}</option>`).join('') || '<option value="">No sports</option>';
+  if (sports.includes(cur)) $(sportSel).value = cur;
+}
+function fillYearSelect(){
+  const years = uniq(S.students.map(s => +s.year_group)).sort();
+  $('#pYear').innerHTML = (years.length ? years : [7,8,9,10,11]).map(y => `<option>${y}</option>`).join('');
+}
+const classStudents = cls => S.students.filter(s => s.class_name === cls).sort((a,b) => a.full_name.localeCompare(b.full_name));
+
+/* ---------- class marks ---------- */
+let marksPhase = 'overview';
+async function renderMarks(){
+  const cls = $('#mClass').value, sport = $('#mSport').value;
+  await loadMarks((gridFor(sport, (S.students.find(x => x.class_name === cls)||{}).year_group)||{}).id, classStudents(cls).map(k => k.id));
+  const g = gridFor(sport, (S.students.find(s => s.class_name === cls) || {}).year_group);
+  $('#mPrintTitle').textContent = `${sport} — ${cls}`;
+  $('#mPrintDate').textContent = new Date().toLocaleDateString();
+  if (!g){ $('#marksTable').innerHTML = `<p class="muted">No assessment grid for ${esc(sport)} in this year group yet. Create one under <b>Assessment grids</b>.</p>`; return; }
+  const sk = skillsOf(g.id), kids = classStudents(cls);
+  const tabs = `<div class="tabs noprint" style="max-width:520px; margin-bottom:12px">
+    ${[['overview','Overview'],['t1','Enter T1'],['t2','Enter T2'],['t3','Enter T3']].map(([k,l]) =>
+      `<button data-p="${k}" aria-selected="${marksPhase===k}">${l}</button>`).join('')}</div>`;
+
+  let table;
+  if (marksPhase === 'overview'){
+    const tot = (sid, ph) => { const v = sk.map(s => (markOf(sid, g.id, ph, s.idx)||{}).level).filter(Boolean); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+    table = `<table><thead><tr><th>Student</th><th>House</th>
+      <th class="num">S1</th><th class="num">T1</th><th class="num">T2</th><th class="num">S2</th><th class="num">T3</th>
+      <th class="num">Gap</th><th class="num">Points</th></tr></thead><tbody>
+      ${kids.map(k => {
+        const gap = sk.map(s => { const a = (markOf(k.id,g.id,'self2',s.idx)||{}).level, b = (markOf(k.id,g.id,'t3',s.idx)||{}).level; return (a&&b) ? Math.abs(a-b) : null; }).filter(x => x !== null);
+        const gv = gap.length ? (gap.reduce((a,b)=>a+b,0)/gap.length) : null;
+        const gc = gv === null ? '' : gv <= 0.5 ? 'gap0' : gv <= 1 ? 'gap1' : 'gap2';
+        const pts = sk.map(s => (markOf(k.id,g.id,'t3',s.idx)||{}).level).filter(Boolean).reduce((n,l) => n + lvlPoints(l), 0);
+        const cell = v => `<td class="num">${v ?? '·'}</td>`;
+        return `<tr><td class="namecell">${esc(k.full_name)}</td>
+          <td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
+          ${cell(tot(k.id,'self1'))}${cell(tot(k.id,'t1'))}${cell(tot(k.id,'t2'))}${cell(tot(k.id,'self2'))}${cell(tot(k.id,'t3'))}
+          <td class="num ${gc}">${gv === null ? '·' : gv.toFixed(1)}</td>
+          <td class="num">${pts || '·'}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  } else {
+    const ph = marksPhase;
+    table = `<table><thead><tr><th>Student</th>
+      ${sk.map(s => `<th class="num" title="${esc(s.name)}">${s.idx}. ${esc(s.name.length > 18 ? s.name.slice(0,17)+'…' : s.name)}</th>`).join('')}
+      <th class="num">Total</th></tr></thead><tbody>
+      ${kids.map(k => {
+        const cells = sk.map(s => {
+          const v = (markOf(k.id, g.id, ph, s.idx)||{}).level || '';
+          return `<td class="num"><select class="lvl" data-v="${v}" data-sid="${k.id}" data-idx="${s.idx}">
+            <option value="">·</option>${[1,2,3,4].map(l => `<option value="${l}" ${v==l?'selected':''}>${l}</option>`).join('')}</select></td>`;
+        }).join('');
+        const tt = sk.map(s => (markOf(k.id,g.id,ph,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
+        return `<tr><td class="namecell">${esc(k.full_name)}</td>${cells}<td class="num">${tt||'·'}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  $('#marksTable').innerHTML = tabs + `<div class="tablewrap">${table}</div>`;
+  $$('#marksTable .tabs button').forEach(b => b.onclick = () => { marksPhase = b.dataset.p; renderMarks(); });
+  $$('#marksTable select.lvl').forEach(sel => sel.onchange = async () => {
+    const sid = +sel.dataset.sid, idx = +sel.dataset.idx, lvl = sel.value ? +sel.value : null;
+    sel.dataset.v = sel.value;
+    const ex = markOf(sid, g.id, marksPhase, idx);
+    if (lvl === null){ if (ex) await DB.remove(T.marks, { id: ex.id }); }
+    else await DB.upsert(T.marks, [{ ...(ex ? { id: ex.id } : {}), student_id: sid, grid_id: g.id, phase: marksPhase, skill_idx: idx, level: lvl }], ['student_id','grid_id','phase','skill_idx']);
+    await loadMarks(g.id, classStudents($('#mClass').value).map(k => k.id));
+    const row = sel.closest('tr'), tds = row.querySelectorAll('td');
+    const tt = skillsOf(g.id).map(s => (markOf(sid,g.id,marksPhase,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
+    tds[tds.length-1].textContent = tt || '·';
+  });
+}
+$('#btnPrintClass').onclick = () => window.print();
+$('#btnExportMarks').onclick = () => {
+  const cls = $('#mClass').value, sport = $('#mSport').value;
+  const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group); if (!g) return;
+  const sk = skillsOf(g.id);
+  const head = ['code','name','class','phase', ...sk.map(s => `s${s.idx}`), 'total'];
+  const rows = [];
+  classStudents(cls).forEach(k => ['self1','t1','t2','self2','t3'].forEach(ph => {
+    const v = sk.map(s => (markOf(k.id,g.id,ph,s.idx)||{}).level || '');
+    if (v.some(x => x !== '')) rows.push([k.code, k.full_name, cls, ph, ...v, v.filter(Boolean).reduce((a,b)=>a+b,0)]);
+  }));
+  downloadCSV(`marks_${cls}_${sport}.csv`, [head, ...rows]);
+};
+
+/* ---------- windows ---------- */
+async function renderWindows(){
+  const cls = $('#wClass').value, sport = $('#wSport').value;
+  await loadMarks((gridFor(sport, (S.students.find(x => x.class_name === cls)||{}).year_group)||{}).id, classStudents(cls).map(k => k.id));
+  $('#winList').innerHTML = Object.keys(PHASES).filter(p => p.startsWith('self')).map(p => {
+    const on = winOpen(cls, sport, p);
+    const done = classStudents(cls).filter(k => { const g = gridFor(sport, k.year_group); return g && phaseDone(k.id, g.id, p); }).length;
+    return `<div class="win"><label class="switch"><input type="checkbox" data-p="${p}" ${on?'checked':''}><i></i></label>
+      <span><b>${p === 'self1' ? 'Lesson 1' : 'Final lesson'}</b><br><span class="tiny muted">${done} of ${classStudents(cls).length} saved</span></span></div>`;
+  }).join('');
+  $$('#winList input').forEach(c => c.onchange = async () => {
+    const w = S.windows.find(w => w.class_name === cls && w.sport === sport && w.phase === c.dataset.p);
+    await DB.upsert(T.windows, [{ ...(w ? { id: w.id } : {}), class_name: cls, sport, phase: c.dataset.p, is_open: c.checked }], ['class_name','sport','phase']);
+    S.windows = await DB.select(T.windows);
+    renderWindows();
+  });
+}
+
+/* ---------- awards ---------- */
+function computeAward(k, g, sk){
+  const lv = (ph, i) => (markOf(k.id, g.id, ph, i)||{}).level || 0;
+  const base = sk.map(s => lvlPoints(lv('t3', s.idx))).reduce((a,b)=>a+b,0);
+  const selfB = ['self1','self2'].filter(p => phaseDone(k.id, g.id, p)).length * S.settings.selfBonus;
+  const gained = sk.map(s => { const a = lv('t1', s.idx), b = lv('t3', s.idx); return (a && b && b > a) ? b - a : 0; }).reduce((a,b)=>a+b,0);
+  const progB = gained * S.settings.progBonus;
+  const diffs = sk.map(s => { const a = lv('self2', s.idx), b = lv('t3', s.idx); return (a && b) ? Math.abs(a-b) : null; });
+  const honB = (diffs.every(d => d !== null && d <= 1)) ? S.settings.honesty : 0;
+  return { base, selfB, progB, honB, hp: base + selfB + progB + honB };
+}
+async function renderAwards(){
+  const cls = $('#aClass').value, sport = $('#aSport').value;
+  const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group);
+  const ids = classStudents(cls).map(k => k.id);
+  await loadMarks((g||{}).id, ids); await loadAwards((g||{}).id, ids);
+  $('#awardRule').textContent = `Final teacher mark: L1=${S.settings.l1}, L2=${S.settings.l2}, L3=${S.settings.l3}, L4=${S.settings.l4}. Bonuses: ${S.settings.selfBonus} per self-assessment completed, ${S.settings.progBonus} per level gained from T1 to T3, ${S.settings.honesty} when all five self-marks land within one level of yours. ${S.settings.hpPerWd} house points = 1 Well Done point; the remainder carries to the next sport.`;
+  if (!g){ $('#awardTable').innerHTML = '<p class="muted">No grid for this sport yet.</p>'; return; }
+  const sk = skillsOf(g.id), kids = classStudents(cls);
+  const issued = a => S.awards.find(x => x.student_id === a && x.grid_id === g.id);
+  $('#awardTable').innerHTML = `<table><thead><tr>
+    <th>Student</th><th>House</th><th class="num">Final</th><th class="num">Self</th><th class="num">Progress</th><th class="num">Honesty</th>
+    <th class="num">House pts</th><th class="num">Carry in</th><th class="num">Well Done</th><th class="num">Carry out</th><th>Status</th></tr></thead><tbody>
+    ${kids.map(k => {
+      const done = issued(k.id);
+      const a = computeAward(k, g, sk);
+      const carry = done ? (done.carry_in || 0) : (k.wd_carry || 0), tot = carry + a.hp;
+      const wd = Math.floor(tot / S.settings.hpPerWd), out = tot % S.settings.hpPerWd;
+      return `<tr><td class="namecell">${esc(k.full_name)}</td>
+        <td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
+        <td class="num">${a.base}</td><td class="num">${a.selfB}</td><td class="num">${a.progB}</td><td class="num">${a.honB}</td>
+        <td class="num"><span class="pill hp">${a.hp}</span></td><td class="num">${carry}</td>
+        <td class="num"><span class="pill wd">${wd}</span></td><td class="num">${out}</td>
+        <td class="tiny">${done ? 'Issued' : 'Not issued'}</td></tr>`;
+    }).join('')}</tbody></table>`;
+}
+$('#btnIssue').onclick = async () => {
+  const cls = $('#aClass').value, sport = $('#aSport').value;
+  const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group); if (!g) return;
+  if (!confirm(`Issue house points to ${cls} for ${sport}? Re-issuing replaces the previous total for this sport.`)) return;
+  const sk = skillsOf(g.id);
+  for (const k of classStudents(cls)){
+    const prev = S.awards.find(x => x.student_id === k.id && x.grid_id === g.id);
+    const carry = prev ? (prev.carry_in || 0) : (k.wd_carry || 0);
+    const a = computeAward(k, g, sk), tot = carry + a.hp;
+    const wd = Math.floor(tot / S.settings.hpPerWd), out = tot % S.settings.hpPerWd;
+    await DB.upsert(T.awards, [{ ...(prev ? { id: prev.id } : {}), student_id: k.id, grid_id: g.id, hp: a.hp, wd, carry_in: carry, carry_out: out, issued_at: new Date().toISOString() }], ['student_id','grid_id']);
+    await DB.update(T.students, { id: k.id }, { wd_carry: out });
+  }
+  await loadAwards(g.id, classStudents(cls).map(k => k.id));
+  S.students = await DB.select(T.students, null, '*');
+  renderAwards(); msg('#awardMsg', 'Points issued. Export the CSV to enter the Well Done points on the school site.', 'ok');
+};
+$('#btnExportAwards').onclick = () => {
+  const cls = $('#aClass').value, sport = $('#aSport').value;
+  const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group); if (!g) return;
+  const sk = skillsOf(g.id);
+  const rows = classStudents(cls).map(k => {
+    const done = S.awards.find(x => x.student_id === k.id && x.grid_id === g.id);
+    const a = computeAward(k, g, sk), carry = done ? (done.carry_in||0) : (k.wd_carry || 0), tot = carry + a.hp;
+    return [k.code, k.full_name, cls, k.house, a.base, a.selfB, a.progB, a.honB, a.hp, Math.floor(tot/S.settings.hpPerWd)];
+  });
+  downloadCSV(`points_${cls}_${sport}.csv`, [['code','name','class','house','final','self_bonus','progress_bonus','honesty_bonus','house_points','well_done_points'], ...rows]);
+};
+
+/* ---------- grid editor ---------- */
+function fillGridSelect(){
+  const cur = $('#gSelect').value;
+  $('#gSelect').innerHTML = S.grids.map(g => `<option value="${g.id}">${esc(g.title || g.sport + ' — Year ' + g.year_group)}</option>`).join('') + '<option value="new">+ New grid…</option>';
+  if (cur) $('#gSelect').value = cur;
+  $('#gSelect').onchange = renderGridEditor;
+}
+function renderGridEditor(){
+  const v = $('#gSelect').value;
+  if (v === 'new' || !S.grids.length){
+    $('#gPrintTitle').textContent = 'New grid';
+    $('#gridEditor').innerHTML = `<div class="card pad"><h3>New grid</h3>
+      <div class="toolbar" style="margin-top:12px">
+        <label class="field"><span>Sport</span><input id="ngSport" placeholder="e.g. Gymnastics"></label>
+        <label class="field"><span>Year group</span><input id="ngYear" type="number" value="8"></label>
+        <button class="btn primary sm" id="btnNewGrid">Create grid</button>
+      </div>
+      <p class="muted small">Creates five empty skills: three motor, one methodological, one social. Fill them in below, or import a CSV.</p></div>`;
+    $('#btnNewGrid').onclick = async () => {
+      const sport = $('#ngSport').value.trim(), year = +$('#ngYear').value;
+      if (!sport) return;
+      await DB.upsert(T.grids, [{ sport, year_group: year, title: `${sport} — Year ${year}` }], ['sport','year_group']);
+      S.grids = await DB.select(T.grids);
+      const gr = S.grids.find(g => g.sport === sport && +g.year_group === year);
+      await DB.upsert(T.skills, [1,2,3,4,5].map(i => ({ grid_id: gr.id, idx: i, type: i <= 3 ? 'motor' : i === 4 ? 'method' : 'social', name: '', criteria: '', d1:'', d2:'', d3:'', d4:'' })), ['grid_id','idx']);
+      S.skills = await DB.select(T.skills);
+      fillGridSelect(); $('#gSelect').value = gr.id; renderGridEditor();
+    };
+    return;
+  }
+  const g = S.grids.find(x => String(x.id) === String(v)); if (!g) return;
+  const sk = skillsOf(g.id);
+  $('#gPrintTitle').textContent = g.title || `${g.sport} — Year ${g.year_group}`;
+  $('#gridEditor').innerHTML = sk.map(s => `<div class="skill" data-idx="${s.idx}">
+    <div class="skill-head">
+      <span class="skill-num">${s.idx}</span>
+      <span class="skill-type ${s.type === 'social' ? 'social' : s.type === 'method' ? 'method' : ''}">${s.type === 'method' ? 'Method' : s.type === 'social' ? 'Social' : 'Motor'}</span>
+      <span style="flex:1">
+        <input class="gname" value="${esc(s.name)}" placeholder="Skill name" style="width:100%; border:0; font-weight:700; font-family:var(--display); font-size:1rem; background:transparent">
+        <input class="gcrit" value="${esc(s.criteria||'')}" placeholder="Criteria" style="width:100%; border:0; color:var(--muted); font-size:.85rem; background:transparent">
+      </span>
+    </div>
+    <div class="rungs">${[1,2,3,4].map(l => `<div class="rung lv${l}" style="cursor:text">
+      <span class="lvl">${l}</span>
+      <textarea class="gd" data-l="${l}" rows="4" style="width:100%; border:0; background:transparent; font:inherit; font-size:.88rem; resize:vertical" placeholder="Level ${l} description">${esc(s['d'+l]||'')}</textarea>
+    </div>`).join('')}</div></div>`).join('')
+    + `<div class="btnrow noprint" style="margin-bottom:20px"><button class="btn primary" id="btnSaveGrid">Save grid</button><span id="gridSaveMsg" class="small muted" style="align-self:center"></span></div>`;
+  $('#btnSaveGrid').onclick = async () => {
+    const rows = Array.from(document.querySelectorAll('#gridEditor .skill')).map(box => {
+      const idx = +box.dataset.idx, ex = sk.find(x => x.idx === idx);
+      const d = {}; box.querySelectorAll('.gd').forEach(t => d['d'+t.dataset.l] = t.value.trim());
+      return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx, type: ex.type, name: box.querySelector('.gname').value.trim(), criteria: box.querySelector('.gcrit').value.trim(), ...d };
+    });
+    await DB.upsert(T.skills, rows, ['grid_id','idx']);
+    S.skills = await DB.select(T.skills);
+    $('#gridSaveMsg').textContent = 'Saved';
+  };
+}
+$('#btnPrintGrid').onclick = () => window.print();
+$('#btnDeleteGrid').onclick = async () => {
+  const g = S.grids.find(x => String(x.id) === $('#gSelect').value); if (!g) return;
+  if (!confirm(`Delete the ${g.sport} Year ${g.year_group} grid and every mark recorded against it?`)) return;
+  await DB.remove(T.skills, { grid_id: g.id }); await DB.remove(T.marks, { grid_id: g.id }); await DB.remove(T.grids, { id: g.id });
+  S.grids = await DB.select(T.grids); S.skills = await DB.select(T.skills);
+  S.marks = S.marks.filter(m => String(m.grid_id) !== String(g.id));
+  fillGridSelect(); renderGridEditor();
+};
+
+/* ---------- programme ---------- */
+function renderProgramme(){
+  $('#progTable').innerHTML = `<table><thead><tr><th>Year</th><th>Sport</th><th>Term</th><th>Grid</th><th></th></tr></thead><tbody>
+    ${S.programme.sort((a,b) => a.year_group - b.year_group || (a.sort||0)-(b.sort||0)).map(p => `<tr>
+      <td class="num">${p.year_group}</td><td>${esc(p.sport)}</td><td class="tiny">${esc(p.term||'')}</td>
+      <td class="tiny">${gridFor(p.sport, p.year_group) ? 'Ready' : '<span class="muted">missing</span>'}</td>
+      <td class="noprint"><button class="btn sm danger" data-del="${p.id}">Remove</button></td></tr>`).join('')}
+    </tbody></table>`;
+  $$('#progTable [data-del]').forEach(b => b.onclick = async () => {
+    await DB.remove(T.programme, { id: isNaN(+b.dataset.del) ? b.dataset.del : +b.dataset.del });
+    S.programme = await DB.select(T.programme); renderProgramme(); fillClassSelects();
+  });
+}
+$('#btnAddProg').onclick = async () => {
+  const sport = $('#pSport').value.trim(); if (!sport) return;
+  await DB.upsert(T.programme, [{ year_group: +$('#pYear').value, sport, term: $('#pTerm').value.trim(), sort: S.programme.length }], ['year_group','sport']);
+  S.programme = await DB.select(T.programme); $('#pSport').value = '';
+  renderProgramme(); fillClassSelects();
+};
+
+/* ---------- students ---------- */
+function renderStudents(){
+  const cls = $('#stClass').value;
+  $('#studentTable').innerHTML = `<table><thead><tr><th>ID</th><th>Name</th><th class="num">Year</th><th>House</th><th class="num">PIN</th><th class="num">Carry</th></tr></thead><tbody>
+    ${classStudents(cls).map(k => `<tr><td class="mono tiny">${esc(k.code)}</td><td class="namecell">${esc(k.full_name)}</td>
+      <td class="num">${k.year_group}</td><td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
+      <td class="num mono">${esc(k.pin)}</td><td class="num">${k.wd_carry||0}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+$('#btnResetPins').onclick = async () => {
+  const cls = $('#stClass').value;
+  if (!confirm(`Give every student in ${cls} a new random PIN?`)) return;
+  for (const k of classStudents(cls)) await DB.update(T.students, { id: k.id }, { pin: String(Math.floor(1000 + Math.random()*9000)) });
+  S.students = await DB.select(T.students, null, '*'); renderStudents();
+};
+$('#btnExportStudents').onclick = () => {
+  const cls = $('#stClass').value;
+  downloadCSV(`students_${cls}.csv`, [['code','full_name','class_name','year_group','house','pin'],
+    ...classStudents(cls).map(k => [k.code, k.full_name, k.class_name, k.year_group, k.house, k.pin])]);
+};
+
+/* ---------- settings ---------- */
+function renderSettings(){
+  const s = S.settings;
+  $('#setL1').value = s.l1; $('#setL2').value = s.l2; $('#setL3').value = s.l3; $('#setL4').value = s.l4;
+  $('#setSelfBonus').value = s.selfBonus; $('#setProgBonus').value = s.progBonus; $('#setHonesty').value = s.honesty; $('#setWd').value = s.hpPerWd;
+  $('#modeLine').textContent = DB.mode === 'supabase' ? 'Connected to Supabase.' : 'Demo mode: everything is stored in this browser only. Add your Supabase URL and key at the top of the file to go live.';
+  $('#btnResetDemo').classList.toggle('hide', DB.mode === 'supabase');
+}
+$('#btnSaveSettings').onclick = async () => {
+  S.settings = { l1:+$('#setL1').value, l2:+$('#setL2').value, l3:+$('#setL3').value, l4:+$('#setL4').value,
+    selfBonus:+$('#setSelfBonus').value, progBonus:+$('#setProgBonus').value, honesty:+$('#setHonesty').value, hpPerWd: Math.max(1, +$('#setWd').value) };
+  await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
+  msg('#setMsg', 'Settings saved.', 'ok');
+};
+$('#btnResetDemo').onclick = () => { if (confirm('Wipe the demo data and start again?')) { seedDemo(true); location.reload(); } };
+
+/* ============================================================
+   CSV
+   ============================================================ */
+function parseCSV(text){
+  const first = text.split('\n')[0] || '';
+  const sep = (first.split(';').length > first.split(',').length) ? ';' : ',';
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){ if (c === '"' && text[i+1] === '"'){ cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === sep){ row.push(cur); cur = ''; }
+    else if (c === '\n'){ row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(c => String(c).trim() !== '')).map(r => r.map(c => c.trim()));
+}
+function toObjects(rows){
+  const head = rows[0].map(h => h.toLowerCase().replace(/\s+/g,'_'));
+  return rows.slice(1).map(r => Object.fromEntries(head.map((h,i) => [h, r[i] ?? ''])));
+}
+function downloadCSV(name, rows){
+  const csv = rows.map(r => r.map(c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g,'""') + '"' : String(c)).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+function wireFile(inputSel, areaSel){ $(inputSel).onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => $(areaSel).value = r.result; r.readAsText(f); }; }
+wireFile('#fileGrid','#csvGrid'); wireFile('#fileProg','#csvProg'); wireFile('#fileStudents','#csvStudents');
+
+$('#btnImportStudents').onclick = async () => {
+  try {
+    const objs = toObjects(parseCSV($('#csvStudents').value));
+    const rows = objs.map(o => ({ code: (o.code||'').toUpperCase(), full_name: o.full_name || o.name, class_name: o.class_name || o.class,
+      year_group: +(o.year_group || o.year || 0), house: o.house || '', pin: String(o.pin || Math.floor(1000+Math.random()*9000)), wd_carry: 0 }))
+      .filter(r => r.code && r.full_name);
+    if (!rows.length) throw new Error('No usable rows. Check the header line.');
+    await DB.upsert(T.students, rows, ['code']);
+    S.students = await DB.select(T.students);
+    fillClassSelects(); renderStudents();
+    msg('#studentMsg', `${rows.length} students imported.`, 'ok');
+  } catch (e){ msg('#studentMsg', e.message, 'err'); }
+};
+$('#btnImportProg').onclick = async () => {
+  try {
+    const objs = toObjects(parseCSV($('#csvProg').value));
+    const rows = objs.map((o,i) => ({ year_group: +(o.year_group || o.year), sport: o.sport, term: o.term || '', sort: i })).filter(r => r.sport && r.year_group);
+    if (!rows.length) throw new Error('No usable rows. Check the header line.');
+    await DB.upsert(T.programme, rows, ['year_group','sport']);
+    S.programme = await DB.select(T.programme);
+    renderProgramme(); fillClassSelects();
+    msg('#progMsg', `${rows.length} lines imported.`, 'ok');
+  } catch (e){ msg('#progMsg', e.message, 'err'); }
+};
+$('#btnImportGrid').onclick = async () => {
+  try {
+    const objs = toObjects(parseCSV($('#csvGrid').value));
+    if (!objs.length) throw new Error('Nothing to import.');
+    const byGrid = {};
+    objs.forEach(o => { const k = `${o.sport}|${o.year_group}`; (byGrid[k] = byGrid[k] || []).push(o); });
+    for (const k in byGrid){
+      const [sport, year] = k.split('|');
+      await DB.upsert(T.grids, [{ sport, year_group: +year, title: `${sport} — Year ${year}` }], ['sport','year_group']);
+      S.grids = await DB.select(T.grids);
+      const g = S.grids.find(x => x.sport === sport && +x.year_group === +year);
+      const existing = skillsOf(g.id);
+      const rows = byGrid[k].map(o => {
+        const idx = +(o.skill_index || o.idx), ex = existing.find(x => x.idx === idx);
+        return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx, type: (o.type||'motor').toLowerCase(),
+          name: o.skill_name || o.name, criteria: o.criteria || '', d1: o.level1, d2: o.level2, d3: o.level3, d4: o.level4 };
+      }).filter(r => r.idx);
+      await DB.upsert(T.skills, rows, ['grid_id','idx']);
+    }
+    S.grids = await DB.select(T.grids); S.skills = await DB.select(T.skills);
+    fillGridSelect(); renderGridEditor();
+    msg('#gridMsg', 'Grid imported.', 'ok');
+  } catch (e){ msg('#gridMsg', e.message, 'err'); }
+};
+$('#btnTplGrid').onclick = () => downloadCSV('grid_template.csv', [
+  ['sport','year_group','skill_index','type','skill_name','criteria','level1','level2','level3','level4'],
+  ['Gymnastics','7','1','motor','Balance','Holds a shape still','Wobbles and steps off','Holds 2 seconds','Holds 4 seconds with a clear shape','Holds 4 seconds on a small base with control'],
+  ['Gymnastics','7','2','motor','','','','','',''],
+  ['Gymnastics','7','3','motor','','','','','',''],
+  ['Gymnastics','7','4','method','','','','','',''],
+  ['Gymnastics','7','5','social','','','','','','']
+]);
+
+/* ============================================================
+   START
+   ============================================================ */
+(async function start(){
+  await DB.init();
+  if (DB.mode === 'demo'){
+    $('#demoHint').classList.remove('hide');
+    const kids = (await DB.select(T.students)).slice(0, 4);
+    $('#demoHint').innerHTML = 'Demo mode — tap a name to sign in.'
+      + '<div class="btnrow" style="margin-top:9px">'
+      + kids.map(k => `<button class="btn sm" data-code="${k.code}" data-pin="${k.pin}">${esc(k.full_name.split(' ')[0])} · ${esc(k.class_name)}</button>`).join('')
+      + '<button class="btn sm primary" data-teacher="1">Teacher</button></div>'
+      + `<div class="tiny" style="margin-top:8px">Or type an ID: <b class="mono">${kids.map(k => k.code).join(' ')}</b> — PIN <b class="mono">${kids[0] ? kids[0].pin : '1234'}</b>. Teacher: any email, password <b class="mono">pe2026</b>.</div>`
+      + (LS_OK ? '' : '<div class="tiny" style="margin-top:6px">This preview cannot save between reloads. Everything works, but refreshing starts again.</div>');
+    $$('#demoHint [data-code]').forEach(b => b.onclick = () => {
+      $('#sCode').value = b.dataset.code; $('#sPin').value = b.dataset.pin;
+      studentLogin(b.dataset.code, b.dataset.pin);
+    });
+    $('#demoHint [data-teacher]').onclick = () => {
+      $('#tabTeacher').click(); $('#tEmail').value = 'teacher@school'; $('#tPass').value = 'pe2026';
+      teacherLogin('teacher@school', 'pe2026');
+    };
+
+  }
+  if (DB.mode === 'supabase'){
+    const { data } = await DB.sb.auth.getSession();
+    if (data && data.session){
+      S.user = data.session.user; S.role = 'teacher';
+      await loadCore(); S.marks = [];
+      headerFor('Teacher', S.user.email); openTeacher(); return;
+    }
+  }
+  show('#scr-login');
+})();
+
+</script>
+</body>
+</html>
