@@ -150,6 +150,7 @@ a{color:var(--brand-2)}
 .tablewrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
 table{border-collapse:collapse; width:100%; font-size:.85rem}
 th,td{border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:middle}
+tfoot th{background:#E7EDE8}
 th{background:#EFF2EE; font-weight:600; font-size:.78rem; white-space:nowrap}
 td.num,th.num{text-align:center; font-family:var(--mono)}
 tbody tr:nth-child(even) td{background:#FAFBF9}
@@ -213,7 +214,24 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
   .tablewrap{overflow:visible}
 }
 
+ol.setup{padding-left:20px; margin:14px 0 18px}
+ol.setup li{margin-bottom:9px; font-size:.92rem}
+.termblock{margin-bottom:22px}
+.termhead{display:flex; align-items:center; gap:9px; margin:0 0 9px; padding-bottom:6px; border-bottom:1px solid var(--line)}
 .classbig{font-family:var(--display); font-weight:800; font-size:3rem; letter-spacing:-.03em; line-height:1}
+
+/* ---------- printable sign-in slips ---------- */
+.slips{display:grid; grid-template-columns:repeat(3,1fr); gap:6mm}
+.slip{border:1px dashed #999; border-radius:3mm; padding:5mm}
+.slipname{font-family:var(--display); font-weight:700; font-size:11pt; margin-bottom:3mm}
+.sliprow{display:flex; justify-content:space-between; font-size:10pt; padding:1mm 0; border-bottom:1px solid #eee}
+.slipfoot{margin-top:3mm; font-size:7.5pt; color:#777}
+.sliphead{margin-bottom:5mm}
+@media print{
+  body.slips .wrap > section{display:none !important}
+  body.slips #slipArea{display:block !important}
+  body.slips .topbar{display:none !important}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
 </style>
 </head>
@@ -280,7 +298,7 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
   <h1 id="sHomeTitle">Your sports</h1>
   <p class="muted small" style="margin-top:4px" id="sHomeSub"></p>
   <div class="kpi" id="sKpi"></div>
-  <div class="grid-cards" id="sportList"></div>
+  <div id="sportList"></div>
 </section>
 
 <!-- ============ STUDENT GRID ============ -->
@@ -297,7 +315,7 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
   <div class="savebar noprint" id="saveBar">
     <div class="progressline"><i id="progFill"></i></div>
     <span class="mono small" id="progText">0 / 5</span>
-    <button class="btn primary" id="btnSaveSelf">Save</button>
+    <span class="small" id="saveState">Saves as you tap</span>
   </div>
 </section>
 
@@ -389,15 +407,16 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
       <h3>Year group programme</h3>
       <p class="muted small">This is the sport list each year group sees. Import it or add sports one at a time.</p>
       <div class="toolbar" style="margin-top:12px">
-        <label class="field"><span>Year</span><select id="pYear"></select></label>
+        <label class="field"><span>Applies to</span><select id="pScope"></select></label>
+        <label class="field"><span>Term</span><select id="pTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
         <label class="field"><span>Sport</span><input id="pSport" list="sportOptions" placeholder="Pick or type"><datalist id="sportOptions"></datalist></label>
-        <label class="field"><span>Term</span><input id="pTerm" placeholder="e.g. Term 1"></label>
         <button class="btn primary sm" id="btnAddProg">Add sport</button>
       </div>
+      <p class="tiny muted">A sport set for one class replaces the year group's sport for that term, so classes can rotate.</p>
       <div class="tablewrap" id="progTable"></div>
       <details class="help">
         <summary>Import programme from CSV</summary>
-        <pre>year_group,sport,term</pre>
+        <pre>year_group,class_name,sport,term   (leave class_name empty for the whole year)</pre>
         <textarea class="csv" id="csvProg"></textarea>
         <div class="btnrow" style="margin-top:8px">
           <input type="file" id="fileProg" accept=".csv" class="btn sm">
@@ -416,6 +435,7 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
         <label class="field"><span>Class</span><select id="stClass"></select></label>
         <button class="btn sm" id="btnResetPins">Reset PINs for this class</button>
         <button class="btn sm" id="btnExportStudents">Export CSV</button>
+        <button class="btn sm" id="btnSlips">Print login slips</button>
       </div>
       <div class="tablewrap" id="studentTable"></div>
       <details class="help">
@@ -445,6 +465,7 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
         <label class="field"><span>Per level gained (T1 &rarr; T3)</span><input type="number" id="setProgBonus" min="0"></label>
         <label class="field"><span>Honesty bonus (all 5 within 1 level)</span><input type="number" id="setHonesty" min="0"></label>
         <label class="field"><span>House points per Well Done point</span><input type="number" id="setWd" min="1"></label>
+        <label class="field"><span>Current term</span><select id="setTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
       </div>
       <div class="btnrow" style="margin-top:6px">
         <button class="btn primary" id="btnSaveSettings">Save settings</button>
@@ -458,6 +479,7 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
   </div>
 </section>
 
+<section id="slipArea" class="hide"></section>
 </main>
 
 <script>
@@ -566,7 +588,7 @@ const S = {
   sport: null, grid: null, phase: 'self1', draft: {}
 };
 const STUDENT_COLS = 'id,code,full_name,class_name,year_group,house,wd_carry';
-const DEFAULT_SETTINGS = { l1:1, l2:2, l3:5, l4:10, selfBonus:5, progBonus:2, honesty:5, hpPerWd:15 };
+const DEFAULT_SETTINGS = { l1:1, l2:2, l3:5, l4:10, selfBonus:5, progBonus:2, honesty:5, hpPerWd:15, currentTerm:'Term 1' };
 const lvlPoints = l => [0, S.settings.l1, S.settings.l2, S.settings.l3, S.settings.l4][l] || 0;
 
 /* ============================================================
@@ -795,7 +817,7 @@ function seedDemo(force){
     [9,'Rugby','Term 1'], [9,'Netball','Term 1'], [9,'Ultimate frisbee','Term 2'], [9,'Fitness','Term 2'], [9,'Athletics','Term 3'], [9,'Pickleball','Term 3'],
     [10,'Fitness','Term 1'], [10,'Gym','Term 1'], [10,'Volleyball','Term 2'], [10,'Swimming speed','Term 2'], [10,'Badminton','Term 3'], [10,'Pickleball','Term 3'],
     [11,'Gym','Term 1'], [11,'Fitness','Term 1'], [11,'Basketball','Term 2'], [11,'Swimming endurance','Term 2'], [11,'Handball','Term 3'], [11,'Dance','Term 3']
-  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, sport, term, sort:i }));
+  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, class_name:'', sport, term, sort:i }));
 
   const grids = [], sk = [];
   let gid = 300, kid = 400;
@@ -940,6 +962,13 @@ $('#btnConfirmClass').onclick = async () => {
   renderStudentHome();
 };
 
+function progFor(cls, year){
+  const own = S.programme.filter(p => p.class_name === cls);
+  const yr = S.programme.filter(p => !p.class_name && +p.year_group === +year);
+  const covered = new Set(own.map(p => p.term));
+  return [...own, ...yr.filter(p => !covered.has(p.term))]
+    .sort((a,b) => String(a.term||'').localeCompare(String(b.term||'')) || (a.sort||0) - (b.sort||0));
+}
 /* ============================================================
    STUDENT — home
    ============================================================ */
@@ -953,21 +982,27 @@ function renderStudentHome(){
     <div class="card"><div class="eyebrow">Well Done points</div><div class="v" style="color:var(--gold)">${wd}</div></div>
     <div class="card"><div class="eyebrow">Towards next</div><div class="v mono">${(S.user.wd_carry||0)}/${S.settings.hpPerWd}</div></div>`;
 
-  const list = S.programme.filter(p => +p.year_group === +S.user.year_group).sort((a,b) => (a.sort||0) - (b.sort||0));
-  if (!list.length){ $('#sportList').innerHTML = `<p class="muted">No sports set for Year ${esc(S.user.year_group)} yet. Your teacher adds them in the programme.</p>`; return; }
-  $('#sportList').innerHTML = list.map(p => {
+  const list = progFor(S.user.class_name, S.user.year_group);
+  if (!list.length){ $('#sportList').innerHTML = `<p class="muted">No sports set for your class yet.</p>`; return; }
+  const now = S.settings.currentTerm || '';
+  const terms = uniq(list.map(p => p.term || 'Other')).sort();
+  const card = p => {
     const g = gridFor(p.sport, S.user.year_group);
     const st = ph => !g ? ''
       : phaseDone(S.user.id, g.id, ph) ? `<span class="chip done">&#10003; ${ph === 'self1' ? 'Lesson 1' : 'Final'}</span>`
       : winOpen(S.user.class_name, p.sport, ph) ? `<span class="chip open">Do it now</span>`
       : '';
-    const earned = S.awards.filter(a => a.student_id === S.user.id && g && a.grid_id === g.id).reduce((n,a) => n + (a.hp||0), 0);
+    const chips = st('self1') + st('self2');
     return `<button class="sport" data-sport="${esc(p.sport)}" ${g ? '' : 'disabled'}>
-      <span class="eyebrow">${esc(p.term || '')}</span>
       <span class="name">${esc(p.sport)}</span>
-      <span class="chips">${st('self1')}${st('self2')}${earned ? `<span class="chip gold">${earned} HP</span>` : ''}</span>
+      <span class="chips">${chips || '<span class="chip locked">Coming up</span>'}</span>
     </button>`;
-  }).join('');
+  };
+  $('#sportList').innerHTML = terms.map(t => `
+    <div class="termblock">
+      <div class="termhead"><span class="eyebrow">${esc(t)}</span>${t === now ? '<span class="chip open">Now</span>' : ''}</div>
+      <div class="grid-cards">${list.filter(p => (p.term || 'Other') === t).map(card).join('')}</div>
+    </div>`).join('');
   $$('#sportList .sport').forEach(b => b.onclick = () => openStudentGrid(b.dataset.sport));
   show('#scr-shome');
 }
@@ -1002,7 +1037,7 @@ function renderLadders(){
   sk.forEach(k => { const m = markOf(S.user.id, g.id, S.phase, k.idx); if (m) S.draft[k.idx] = m.level; });
 
   msg('#phaseMsg',
-    open ? (saved ? 'Saved. You can still change it.' : 'Tap the description that sounds most like you, for each of the 5 skills.')
+    open ? (saved ? 'Saved. You can still change it.' : 'Tap the description that sounds most like you. It saves on its own.')
          : (saved ? 'Saved. T1, T2 and T3 are your teacher\'s marks.' : 'Your teacher has not opened this yet.'),
     open && saved ? 'ok' : 'info');
 
@@ -1023,6 +1058,7 @@ function renderLadders(){
     S.draft[idx] = +b.dataset.l;
     b.closest('.rungs').querySelectorAll('.rung').forEach(x => x.setAttribute('aria-pressed', x === b));
     updateProgress();
+    saveOne(idx, +b.dataset.l);
   });
   $('#saveBar').classList.toggle('hide', !open);
   updateProgress();
@@ -1032,33 +1068,47 @@ function updateProgress(){
   const n = Object.keys(S.draft).length;
   $('#progFill').style.width = (n/5*100) + '%';
   $('#progText').textContent = `${n} / 5`;
-  $('#btnSaveSelf').disabled = n < 5;
 }
 $('#btnBackHome').onclick = () => renderStudentHome();
 $('#btnPrintSelf').onclick = () => window.print();
-$('#btnSaveSelf').onclick = async () => {
-  const g = S.grid;
-  const rows = Object.keys(S.draft).map(idx => {
-    const ex = markOf(S.user.id, g.id, S.phase, +idx);
-    return { ...(ex ? { id: ex.id } : {}), student_id: S.user.id, grid_id: g.id, phase: S.phase, skill_idx: +idx, level: S.draft[idx] };
-  });
-  await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
-  S.marks = await DB.select(T.marks, { student_id: S.user.id });
-  renderLadders();
-  msg('#phaseMsg', 'Saved. Your teacher can see it now.', 'ok');
-};
+async function saveOne(idx, level){
+  const g = S.grid, ex = markOf(S.user.id, g.id, S.phase, idx);
+  $('#saveState').textContent = 'Saving…';
+  try {
+    await DB.upsert(T.marks, [{ ...(ex ? { id: ex.id } : {}), student_id: S.user.id, grid_id: g.id, phase: S.phase, skill_idx: idx, level }], ['student_id','grid_id','phase','skill_idx']);
+    S.marks = await DB.select(T.marks, { student_id: S.user.id });
+    const all = Object.keys(S.draft).length === 5;
+    $('#saveState').textContent = all ? 'All 5 saved' : 'Saved';
+    if (all) msg('#phaseMsg', 'All done. Your teacher can see it now.', 'ok');
+  } catch (e){ $('#saveState').textContent = 'Not saved — try again'; }
+}
 
 /* ============================================================
    TEACHER
    ============================================================ */
 function openTeacher(){
-  fillClassSelects(); fillYearSelect(); fillGridSelect();
+  fillClassSelects(); fillGridSelect();
   switchTab('marks'); show('#scr-teacher');
 }
 $('#tnav').onclick = e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.t); };
+function firstRun(){
+  if (S.students.length) return false;
+  $('#t-marks').innerHTML = `<div class="card pad"><h3>Set up in three steps</h3>
+    <p class="muted small">Nothing is in the database yet. Do these once and the app is ready.</p>
+    <ol class="setup">
+      <li><b>Load the sports.</b> Grids tab &rarr; <i>Load standard sports</i>. 15 sports, two age bands each.</li>
+      <li><b>Add your students.</b> Students tab &rarr; import a CSV of <span class="mono tiny">code, full_name, class_name, year_group, house</span>.</li>
+      <li><b>Set the programme.</b> Programme tab &rarr; which sport each year group or class does in each term.</li>
+    </ol>
+    <div class="btnrow"><button class="btn primary sm" data-go="grids">Go to Grids</button>
+      <button class="btn sm" data-go="students">Go to Students</button></div></div>`;
+  $$('#t-marks [data-go]').forEach(b => b.onclick = () => switchTab(b.dataset.go));
+  return true;
+}
 function switchTab(t){
   $$('#tnav button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
   ['marks','windows','awards','grids','programme','students','settings'].forEach(k => $('#t-'+k).classList.toggle('hide', k !== t));
+  if (t === 'marks' && firstRun()) return;
   ({ marks:renderMarks, windows:renderWindows, awards:renderAwards, grids:renderGridEditor, programme:renderProgramme, students:renderStudents, settings:renderSettings }[t])();
 }
 function fillClassSelects(){
@@ -1077,14 +1127,10 @@ function rerender(){ const t = $('#tnav button[aria-selected="true"]').dataset.t
 function fillSportSelect(clsSel, sportSel){
   const cls = $(clsSel).value;
   const yr = (S.students.find(s => s.class_name === cls) || {}).year_group;
-  const sports = S.programme.filter(p => +p.year_group === +yr).sort((a,b) => (a.sort||0)-(b.sort||0)).map(p => p.sport);
+  const sports = uniq(progFor(cls, yr).map(p => p.sport));
   const cur = $(sportSel).value;
   $(sportSel).innerHTML = sports.map(s => `<option>${esc(s)}</option>`).join('') || '<option value="">No sports</option>';
   if (sports.includes(cur)) $(sportSel).value = cur;
-}
-function fillYearSelect(){
-  const years = uniq(S.students.map(s => +s.year_group)).sort();
-  $('#pYear').innerHTML = (years.length ? years : [7,8,9,10,11]).map(y => `<option>${y}</option>`).join('');
 }
 const classStudents = cls => S.students.filter(s => s.class_name === cls).sort((a,b) => a.full_name.localeCompare(b.full_name));
 
@@ -1123,6 +1169,7 @@ async function renderMarks(){
       }).join('')}</tbody></table>`;
   } else {
     const ph = marksPhase;
+    const avg = i => { const v = kids.map(k => (markOf(k.id,g.id,ph,i)||{}).level).filter(Boolean); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : '·'; };
     table = `<table><thead><tr><th>Student</th>
       ${sk.map(s => `<th class="num" title="${esc(s.name)}">${s.idx}. ${esc(s.name.length > 18 ? s.name.slice(0,17)+'…' : s.name)}</th>`).join('')}
       <th class="num">Total</th></tr></thead><tbody>
@@ -1134,9 +1181,24 @@ async function renderMarks(){
         }).join('');
         const tt = sk.map(s => (markOf(k.id,g.id,ph,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
         return `<tr><td class="namecell">${esc(k.full_name)}</td>${cells}<td class="num">${tt||'·'}</td></tr>`;
-      }).join('')}</tbody></table>`;
+      }).join('')}</tbody>
+      <tfoot><tr><th>Class average</th>${sk.map(x => `<th class="num">${avg(x.idx)}</th>`).join('')}<th></th></tr></tfoot></table>`;
   }
-  $('#marksTable').innerHTML = tabs + `<div class="tablewrap">${table}</div>`;
+  const from = { t2:'t1', t3:'t2' }[marksPhase];
+  const copyBtn = from ? `<button class="btn sm noprint" id="btnCopyPhase" style="margin-bottom:12px">Start from ${from.toUpperCase()} marks</button>` : '';
+  $('#marksTable').innerHTML = tabs + copyBtn + `<div class="tablewrap">${table}</div>`;
+  if (from) $('#btnCopyPhase').onclick = async () => {
+    const rows = [];
+    kids.forEach(k => sk.forEach(x => {
+      const src = (markOf(k.id, g.id, from, x.idx)||{}).level;
+      if (src && !(markOf(k.id, g.id, marksPhase, x.idx)||{}).level)
+        rows.push({ student_id: k.id, grid_id: g.id, phase: marksPhase, skill_idx: x.idx, level: src });
+    }));
+    if (!rows.length) return alert(`Nothing to copy — every ${marksPhase.toUpperCase()} box already has a mark, or ${from.toUpperCase()} is empty.`);
+    await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
+    await loadMarks(g.id, kids.map(k => k.id));
+    renderMarks();
+  };
   $$('#marksTable .tabs button').forEach(b => b.onclick = () => { marksPhase = b.dataset.p; renderMarks(); });
   $$('#marksTable select.lvl').forEach(sel => sel.onchange = async () => {
     const sid = +sel.dataset.sid, idx = +sel.dataset.idx, lvl = sel.value ? +sel.value : null;
@@ -1325,11 +1387,21 @@ $('#btnDeleteGrid').onclick = async () => {
 
 /* ---------- programme ---------- */
 function renderProgramme(){
-  $('#sportOptions').innerHTML = S.grids.map(g => `<option value="${esc(g.sport)}">`).join('');
-  $('#progTable').innerHTML = `<table><thead><tr><th>Year</th><th>Sport</th><th>Term</th><th>Grid</th><th></th></tr></thead><tbody>
-    ${S.programme.sort((a,b) => a.year_group - b.year_group || (a.sort||0)-(b.sort||0)).map(p => `<tr>
-      <td class="num">${p.year_group}</td><td>${esc(p.sport)}</td><td class="tiny">${esc(p.term||'')}</td>
-      <td class="tiny">${gridFor(p.sport, p.year_group) ? 'Ready' : '<span class="muted">missing</span>'}</td>
+  $('#sportOptions').innerHTML = uniq(S.grids.map(g => g.sport)).map(sp => `<option value="${esc(sp)}">`).join('');
+  const years = uniq(S.students.map(s => +s.year_group)).sort();
+  const classes = uniq(S.students.map(s => s.class_name)).sort();
+  const cur = $('#pScope').value;
+  $('#pScope').innerHTML = years.map(y => `<option value="Y${y}">Year ${y} — all classes</option>`).join('')
+    + classes.map(c => `<option value="C${c}">${esc(c)} only</option>`).join('');
+  if (cur) $('#pScope').value = cur;
+  const scopeLabel = p => p.class_name ? p.class_name : `Year ${p.year_group} (all)`;
+  const rows = S.programme.slice().sort((a,b) => (a.year_group - b.year_group)
+    || String(a.class_name||'').localeCompare(String(b.class_name||''))
+    || String(a.term||'').localeCompare(String(b.term||'')));
+  $('#progTable').innerHTML = `<table><thead><tr><th>Applies to</th><th>Term</th><th>Sport</th><th>Grid</th><th class="noprint"></th></tr></thead><tbody>
+    ${rows.map(p => `<tr>
+      <td class="namecell">${esc(scopeLabel(p))}</td><td class="tiny">${esc(p.term||'')}</td><td>${esc(p.sport)}</td>
+      <td class="tiny">${gridFor(p.sport, p.year_group) ? esc(gridFor(p.sport, p.year_group).title) : '<span class="muted">missing</span>'}</td>
       <td class="noprint"><button class="btn sm danger" data-del="${p.id}">Remove</button></td></tr>`).join('')}
     </tbody></table>`;
   $$('#progTable [data-del]').forEach(b => b.onclick = async () => {
@@ -1339,7 +1411,11 @@ function renderProgramme(){
 }
 $('#btnAddProg').onclick = async () => {
   const sport = $('#pSport').value.trim(); if (!sport) return;
-  await DB.upsert(T.programme, [{ year_group: +$('#pYear').value, sport, term: $('#pTerm').value.trim(), sort: S.programme.length }], ['year_group','sport']);
+  const scope = $('#pScope').value;
+  const cls = scope[0] === 'C' ? scope.slice(1) : '';
+  const year = cls ? (S.students.find(s => s.class_name === cls)||{}).year_group : +scope.slice(1);
+  await DB.upsert(T.programme, [{ year_group: +year, class_name: cls, sport, term: $('#pTerm').value, sort: S.programme.length }],
+    ['year_group','class_name','sport','term']);
   S.programme = await DB.select(T.programme); $('#pSport').value = '';
   renderProgramme(); fillClassSelects();
 };
@@ -1359,6 +1435,19 @@ $('#btnResetPins').onclick = async () => {
   for (const k of classStudents(cls)) await DB.update(T.students, { id: k.id }, { pin: String(Math.floor(1000 + Math.random()*9000)) });
   S.students = await DB.select(T.students, null, '*'); renderStudents();
 };
+$('#btnSlips').onclick = () => {
+  const cls = $('#stClass').value;
+  $('#slipArea').innerHTML = `<h2 class="sliphead">${esc(cls)} — sign-in slips</h2><div class="slips">`
+    + classStudents(cls).map(k => `<div class="slip">
+        <div class="slipname">${esc(k.full_name)}</div>
+        <div class="sliprow"><span>ID</span><b class="mono">${esc(k.code)}</b></div>
+        <div class="sliprow"><span>PIN</span><b class="mono">${esc(k.pin)}</b></div>
+        <div class="slipfoot">${esc(cls)} · PE assessment</div></div>`).join('')
+    + '</div>';
+  document.body.classList.add('slips');
+  window.print();
+  setTimeout(() => document.body.classList.remove('slips'), 500);
+};
 $('#btnExportStudents').onclick = () => {
   const cls = $('#stClass').value;
   downloadCSV(`students_${cls}.csv`, [['code','full_name','class_name','year_group','house','pin'],
@@ -1370,12 +1459,14 @@ function renderSettings(){
   const s = S.settings;
   $('#setL1').value = s.l1; $('#setL2').value = s.l2; $('#setL3').value = s.l3; $('#setL4').value = s.l4;
   $('#setSelfBonus').value = s.selfBonus; $('#setProgBonus').value = s.progBonus; $('#setHonesty').value = s.honesty; $('#setWd').value = s.hpPerWd;
+  $('#setTerm').value = s.currentTerm || 'Term 1';
   $('#modeLine').textContent = DB.mode === 'supabase' ? 'Connected to Supabase.' : 'Demo mode: everything is stored in this browser only. Add your Supabase URL and key at the top of the file to go live.';
   $('#btnResetDemo').classList.toggle('hide', DB.mode === 'supabase');
 }
 $('#btnSaveSettings').onclick = async () => {
   S.settings = { l1:+$('#setL1').value, l2:+$('#setL2').value, l3:+$('#setL3').value, l4:+$('#setL4').value,
-    selfBonus:+$('#setSelfBonus').value, progBonus:+$('#setProgBonus').value, honesty:+$('#setHonesty').value, hpPerWd: Math.max(1, +$('#setWd').value) };
+    selfBonus:+$('#setSelfBonus').value, progBonus:+$('#setProgBonus').value, honesty:+$('#setHonesty').value,
+    hpPerWd: Math.max(1, +$('#setWd').value), currentTerm: $('#setTerm').value };
   await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
   msg('#setMsg', 'Settings saved.', 'ok');
 };
@@ -1428,9 +1519,9 @@ $('#btnImportStudents').onclick = async () => {
 $('#btnImportProg').onclick = async () => {
   try {
     const objs = toObjects(parseCSV($('#csvProg').value));
-    const rows = objs.map((o,i) => ({ year_group: +(o.year_group || o.year), sport: o.sport, term: o.term || '', sort: i })).filter(r => r.sport && r.year_group);
+    const rows = objs.map((o,i) => ({ year_group: +(o.year_group || o.year), class_name: o.class_name || o.class || '', sport: o.sport, term: o.term || '', sort: i })).filter(r => r.sport && r.year_group);
     if (!rows.length) throw new Error('No usable rows. Check the header line.');
-    await DB.upsert(T.programme, rows, ['year_group','sport']);
+    await DB.upsert(T.programme, rows, ['year_group','class_name','sport','term']);
     S.programme = await DB.select(T.programme);
     renderProgramme(); fillClassSelects();
     msg('#progMsg', `${rows.length} lines imported.`, 'ok');
