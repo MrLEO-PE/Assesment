@@ -210,12 +210,19 @@ details.help pre{overflow-x:auto; background:#F2F5F1; padding:9px; border-radius
   .rung .txt{font-size:8.5pt; line-height:1.25}
   .rung[aria-pressed="true"]{-webkit-print-color-adjust:exact; print-color-adjust:exact}
   table{font-size:8pt} th,td{padding:3px 4px}
+  .noteshead{page-break-before:always; border-top:0; padding-top:0; margin:0 0 5mm}
+  #notes{column-count:2; column-gap:8mm; font-size:9pt}
+  .note{break-inside:avoid; margin-bottom:4mm}
   select.lvl{border:0; -webkit-appearance:none; appearance:none; -webkit-print-color-adjust:exact; print-color-adjust:exact}
   .tablewrap{overflow:visible}
 }
 
 ol.setup{padding-left:20px; margin:14px 0 18px}
 ol.setup li{margin-bottom:9px; font-size:.92rem}
+.noteshead{margin:26px 0 12px; padding-top:16px; border-top:2px solid var(--ink); font-size:1.05rem}
+.note{margin-bottom:14px}
+.note h3{font-size:.95rem; margin-bottom:3px}
+.note p{margin:0; font-size:.9rem; color:#3D474F}
 .termblock{margin-bottom:22px}
 .termhead{display:flex; align-items:center; gap:9px; margin:0 0 9px; padding-bottom:6px; border-bottom:1px solid var(--line)}
 .classbig{font-family:var(--display); font-weight:800; font-size:3rem; letter-spacing:-.03em; line-height:1}
@@ -312,6 +319,7 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
   <p class="muted small" id="phaseLine" style="margin:4px 0 0"></p>
   <div id="phaseMsg"></div>
   <div id="ladders" style="margin-top:14px"></div>
+  <div id="notes"></div>
   <div class="savebar noprint" id="saveBar">
     <div class="progressline"><i id="progFill"></i></div>
     <span class="mono small" id="progText">0 / 5</span>
@@ -388,9 +396,23 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
     <div class="printhead"><h2 id="gPrintTitle"></h2><span class="mono small">Levels 1&ndash;4</span></div>
     <div id="gridEditor"></div>
     <details class="help noprint">
+      <summary>Import a grid from a PDF sheet</summary>
+      <p class="small muted">Your recto/verso sheet: page 1 the table (Skill, then Level 1 to Level 4), page 2 the technical expectations. Any number of skills.</p>
+      <div class="toolbar" style="margin-top:8px">
+        <input type="file" id="filePdf" accept="application/pdf,.pdf" class="btn sm">
+        <label class="field"><span>Sport</span><input id="pdfSport" placeholder="read from the PDF"></label>
+        <label class="field"><span>Applies to</span><select id="pdfBand">
+          <option value="0">All year groups</option><option value="78">Years 7&ndash;8</option><option value="911">Years 9&ndash;11</option>
+          <option value="7">Year 7</option><option value="8">Year 8</option><option value="9">Year 9</option><option value="10">Year 10</option><option value="11">Year 11</option>
+        </select></label>
+        <button class="btn primary sm" id="btnImportPdf">Import PDF</button>
+      </div>
+      <div id="pdfMsg"></div>
+    </details>
+    <details class="help noprint">
       <summary>Import a grid from CSV</summary>
       <p class="small muted">One row per skill, 5 rows per grid. Header row required.</p>
-      <pre>sport,year_group,skill_index,type,skill_name,criteria,level1,level2,level3,level4</pre>
+      <pre>sport,year_group,skill_index,type,skill_name,criteria,level1,level2,level3,level4,notes</pre>
       <textarea class="csv" id="csvGrid" placeholder="Paste CSV here, or use the file picker below"></textarea>
       <div class="btnrow" style="margin-top:8px">
         <input type="file" id="fileGrid" accept=".csv" class="btn sm">
@@ -509,6 +531,7 @@ const store = {
   get: k => { try { return LS_OK ? localStorage.getItem(k) : (MEM[k] ?? null); } catch { return MEM[k] ?? null; } },
   set: (k, v) => { try { LS_OK ? localStorage.setItem(k, v) : (MEM[k] = v); } catch { MEM[k] = v; } }
 };
+const LEVEL_NAME = ['', 'Needs work', 'Developing', 'Proficient', 'Advanced'];
 const T = { settings:'aa_settings', students:'aa_students', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', windows:'aa_windows', marks:'aa_marks', awards:'aa_awards' };
 
 /* ============================================================
@@ -592,206 +615,223 @@ const DEFAULT_SETTINGS = { l1:1, l2:2, l3:5, l4:10, selfBonus:5, progBonus:2, ho
 const lvlPoints = l => [0, S.settings.l1, S.settings.l2, S.settings.l3, S.settings.l4][l] || 0;
 
 /* ============================================================
-   SPORT LIBRARY — 15 sports x 2 age bands.
-   Each grid: 5 skills (3 motor, 1 methodological, 1 social), 4 levels.
-   y78  = Years 7-8 expectations
-   y911 = Years 9-11 expectations (same skills, raised standard)
-   All wording is editable by the teacher in the Grids tab.
+   SPORT LIBRARY
+   Each grid: 5 or 6 skills (motor / methodological / social), 4 levels,
+   written in the student's own voice, plus a technical note per skill
+   printed on the back of the sheet.
+   y78 / y911 = Years 7-8 and Years 9-11 expectations.
+   'all' = one grid for every year group.
+   Everything is editable by the teacher in the Grids tab.
    ============================================================ */
 const LIB = {
 "Gymnastics": {
-  skills: [["motor", "Balance", "Holds a shape still"], ["motor", "Rotation", "Rolls and turns safely"], ["motor", "Flight and landing", "Jumps and lands under control"], ["method", "Building my routine", "Works safely at my own level"], ["social", "Spotting and judging", "Helps others work safely"]],
-  y78: [["Wobbles and steps off straight away.", "Holds a shape for 2 seconds on a large base.", "Holds for 4 seconds with straight legs and pointed toes.", "Holds for 4 seconds on a small base, body and arms still."],
-        ["Rolls sideways with no tuck.", "Forward roll, needs help to stand up.", "Forward and backward roll, stands up without hands.", "Links two rotations with a jump and no pause."],
-        ["Lands heavily and steps forward.", "Straight jump, lands on two feet.", "Tuck or star jump with a still landing.", "Jump with a half turn, landing held, knees bent."],
-        ["Waits to be told what to do next.", "Repeats a task when reminded.", "Chooses the version of a skill that suits them and repeats it.", "Links four elements into a routine and improves it after feedback."],
-        ["Watches without helping.", "Holds a mat when asked.", "Spots a partner correctly and gives one clear tip.", "Judges a routine against the criteria and explains the level."]],
-  y911: [["Holds a shape for 2 seconds on a large base.", "Holds 4 seconds with straight legs and pointed toes.", "Holds 5 seconds on a small base with a clearly extended shape.", "Moves smoothly in and out of an inverted or one-foot balance under control."],
-         ["Forward roll, stands up using the hands.", "Forward and backward roll, stands without hands.", "Links rotations both ways with no pause and clear body tension.", "Performs a rotation with flight or a change of level under full control."],
-         ["Straight jump, lands on two feet.", "Tuck or star jump with a still landing.", "Jump with a half turn, landing held.", "Jump with a full turn or from apparatus, landing stuck with no step."],
-         ["Repeats a task when reminded.", "Chooses the version of a skill that suits them.", "Builds a six-element routine with a clear start and finish.", "Refines the routine from feedback, adjusting timing and difficulty."],
-         ["Holds a mat when asked.", "Spots a partner correctly.", "Judges a routine against the criteria and explains the level.", "Coaches a group safely through a progression and adapts it to their level."]]},
+  skills: [["motor", "Balance", "I hold a shape still"], ["motor", "Rotation", "I roll and turn safely"], ["motor", "Flight and landing", "I jump and land under control"], ["method", "Building my routine", "I work safely at my own level"], ["social", "Spotting and judging", "I help others work safely"]],
+  y78: [["I wobble and step off straight away.", "I hold a shape for 2 seconds on a large base.", "I hold for 4 seconds with straight legs and pointed toes.", "I hold for 4 seconds on a small base, body and arms still."],
+        ["I roll sideways with no tuck.", "I forward roll but need help to stand up.", "I roll forwards and backwards and stand up without my hands.", "I link two rotations with a jump and no pause."],
+        ["I land heavily and step forward.", "I do a straight jump and land on two feet.", "I do a tuck or star jump with a still landing.", "I jump with a half turn and hold the landing with my knees bent."],
+        ["I wait to be told what to do next.", "I repeat a task when reminded.", "I choose the version of a skill that suits me and repeat it.", "I link four elements into a routine and improve it after feedback."],
+        ["I watch without helping.", "I hold a mat when asked.", "I spot a partner correctly and give one clear tip.", "I judge a routine against the criteria and explain the level."]],
+  y911: [["I hold a shape for 2 seconds on a large base.", "I hold 4 seconds with straight legs and pointed toes.", "I hold 5 seconds on a small base with a clearly extended shape.", "I move smoothly in and out of an inverted or one-foot balance under control."],
+         ["I forward roll and stand up using my hands.", "I roll forwards and backwards and stand up without my hands.", "I link rotations both ways with no pause and clear body tension.", "I perform a rotation with flight or a change of level under full control."],
+         ["I do a straight jump and land on two feet.", "I do a tuck or star jump with a still landing.", "I jump with a half turn and hold the landing.", "I jump with a full turn or from apparatus and stick the landing with no step."],
+         ["I repeat a task when reminded.", "I choose the version of a skill that suits me.", "I build a six-element routine with a clear start and finish.", "I refine the routine from feedback, adjusting timing and difficulty."],
+         ["I hold a mat when asked.", "I spot a partner correctly.", "I judge a routine against the criteria and explain the level.", "I coach a group safely through a progression and adapt it to my level."]]},
 "Dance": {
-  skills: [["motor", "Actions and shapes", "Performs the moves clearly"], ["motor", "Rhythm and timing", "Moves with the music"], ["motor", "Performing", "Performs for an audience"], ["method", "Creating", "Makes and remembers material"], ["social", "Working in the group", "Helps the group make progress"]],
-  y78: [["Copies late and unsure.", "Copies the moves with help.", "Clear shapes, full extension, correct timing.", "Controls size and level on purpose to change the effect."],
-        ["Moves off the beat.", "Finds the beat with the group.", "Stays on the beat for the whole phrase.", "Uses accents, pauses and speed changes in the music."],
-        ["Looks at the floor, minimal effort.", "Performs quietly with some hesitation.", "Performs with focus and a clear front.", "Performs with projection and expression from start to finish."],
-        ["Waits for others to decide.", "Offers one idea.", "Creates an eight-count phrase and remembers it.", "Develops the phrase using canon, unison or a change of direction."],
-        ["Works alone or off task.", "Joins in when asked.", "Listens, shares ideas and keeps the group on task.", "Leads the rehearsal and gives useful feedback to others."]],
-  y911: [["Copies the moves with help.", "Clear shapes and correct timing.", "Controls size, level and direction on purpose.", "Performs complex material with precision and quality from start to finish."],
-         ["Finds the beat with the group.", "Stays on the beat for the whole phrase.", "Uses accents, pauses and speed changes.", "Holds their own timing in canon or against a counter-rhythm."],
-         ["Performs quietly with hesitation.", "Performs with focus and a clear front.", "Performs with projection and expression throughout.", "Performs in character, using dynamics and focus to communicate an idea."],
-         ["Offers one idea.", "Creates an eight-count phrase and remembers it.", "Develops material using canon, unison, level or direction.", "Choreographs a section with a clear structure and justifies it against a stimulus."],
-         ["Joins in when asked.", "Listens and shares ideas.", "Leads a rehearsal and gives useful feedback.", "Manages the group's process: sets tasks, settles disagreement, meets the deadline."]]},
+  skills: [["motor", "Actions and shapes", "I perform the moves clearly"], ["motor", "Rhythm and timing", "I move with the music"], ["motor", "Performing", "I perform for an audience"], ["method", "Creating", "I make and remembers material"], ["social", "Working in the group", "I help the group make progress"]],
+  y78: [["I copy late and unsure.", "I copy the moves with help.", "I make clear shapes with full extension and correct timing.", "I control size and level on purpose to change the effect."],
+        ["I move off the beat.", "I find the beat with the group.", "I stay on the beat for the whole phrase.", "I use accents, pauses and speed changes in the music."],
+        ["I look at the floor, minimal effort.", "I perform quietly with some hesitation.", "I perform with focus and a clear front.", "I perform with projection and expression from start to finish."],
+        ["I wait for others to decide.", "I offer one idea.", "I create an eight-count phrase and remember it.", "I develop the phrase using canon, unison or a change of direction."],
+        ["I work alone or off task.", "I join in when asked.", "I listen, share ideas and keep the group on task.", "I lead the rehearsal and give useful feedback to others."]],
+  y911: [["I copy the moves with help.", "I make clear shapes and keep the timing.", "I control size, level and direction on purpose.", "I perform complex material with precision and quality from start to finish."],
+         ["I find the beat with the group.", "I stay on the beat for the whole phrase.", "I use accents, pauses and speed changes.", "I hold my own timing in canon or against a counter-rhythm."],
+         ["I perform quietly with hesitation.", "I perform with focus and a clear front.", "I perform with projection and expression throughout.", "I perform in character, using dynamics and focus to communicate an idea."],
+         ["I offer one idea.", "I create an eight-count phrase and remember it.", "I develop material using canon, unison, level or direction.", "I choreograph a section with a clear structure and justify it against a stimulus."],
+         ["I join in when asked.", "I listen and share ideas.", "I lead a rehearsal and give useful feedback.", "I manage the group's process: I set tasks, settle disagreements and meet the deadline."]]},
 "Gym": {
-  skills: [["motor", "Technique", "Lifts with correct form"], ["motor", "Choosing the load", "Matches the weight to the goal"], ["motor", "Work capacity", "Completes the session"], ["method", "Planning and recording", "Tracks my own training"], ["social", "Spotting and gym etiquette", "Keeps the gym safe for everyone"]],
-  y78: [["Rounded back or half range of movement.", "Correct shape with a light weight.", "Full range, controlled tempo, correct breathing.", "Holds technique on the last reps of a hard set."],
-        ["Uses the same weight whatever the goal.", "Changes the weight when told.", "Picks a weight that fits the goal: endurance, volume or strength.", "Progresses load or reps week to week and records it."],
-        ["Stops early and drifts between sets.", "Finishes the sets with very long breaks.", "Completes the session with the planned rest times.", "Completes the session and finishes the last set strongly."],
-        ["Arrives with no plan.", "Follows a plan they are given.", "Records sets, reps and weight every session.", "Uses the record to set the next target and adapts the plan."],
-        ["Leaves equipment out and ignores others.", "Clears their own equipment when reminded.", "Spots a partner safely, wipes and racks equipment.", "Coaches a partner\\u2019s technique and manages the space for the group."]],
-  y911: [["Correct shape with a light weight.", "Full range, controlled tempo, correct breathing.", "Holds technique on the last reps of a hard set.", "Keeps technique on compound lifts near maximum and knows when to stop a set."],
-         ["Changes the weight when told.", "Picks a weight that fits the goal.", "Progresses load or reps week to week and records it.", "Plans loads across a training block and adjusts for how the session feels."],
-         ["Finishes the sets with long breaks.", "Completes the session with the planned rest times.", "Completes the session and finishes the last set strongly.", "Sustains quality across a full training week."],
-         ["Follows a plan they are given.", "Records sets, reps and weight every session.", "Uses the record to set the next target.", "Writes their own programme for a goal and explains the training principles behind it."],
-         ["Clears their own equipment when reminded.", "Spots a partner safely and racks equipment.", "Coaches a partner's technique.", "Runs a session for a partner: warm-up, loads, spotting and feedback."]]},
+  skills: [["motor", "Technique", "I lift with correct form"], ["motor", "Choosing the load", "I match the weight to the goal"], ["motor", "Work capacity", "I complete the session"], ["method", "Planning and recording", "I track my own training"], ["social", "Spotting and gym etiquette", "I keep the gym safe for everyone"]],
+  y78: [["I lift with a rounded back or only half the range of movement.", "I keep the correct shape with a light weight.", "I lift through the full range, at a controlled tempo, breathing correctly.", "I hold technique on the last reps of a hard set."],
+        ["I use the same weight whatever the goal.", "I change the weight when told.", "I pick a weight that fits the goal: endurance, volume or strength.", "I progress load or reps week to week and record it."],
+        ["I stop early and drifts between sets.", "I finish the sets with very long breaks.", "I complete the session with the planned rest times.", "I complete the session and finish the last set strongly."],
+        ["I arrive with no plan.", "I follow a plan I are given.", "I record sets, reps and weight every session.", "I use the record to set the next target and adapt the plan."],
+        ["I leave equipment out and ignore others.", "I clear my own equipment when reminded.", "I spot a partner safely, wipes and rack equipment.", "I coach a partner\\u2019s technique and manage the space for the group."]],
+  y911: [["I keep the correct shape with a light weight.", "I lift through the full range, at a controlled tempo, breathing correctly.", "I hold technique on the last reps of a hard set.", "I keep technique on compound lifts near maximum and know when to stop a set."],
+         ["I change the weight when told.", "I pick a weight that fits the goal.", "I progress load or reps week to week and record it.", "I plan loads across a training block and adjust for how the session feels."],
+         ["I finish the sets with long breaks.", "I complete the session with the planned rest times.", "I complete the session and finish the last set strongly.", "I sustain quality across a full training week."],
+         ["I follow a plan I are given.", "I record sets, reps and weight every session.", "I use the record to set the next target.", "I write my own programme for a goal and explain the training principles behind it."],
+         ["I clear my own equipment when reminded.", "I spot a partner safely and rack equipment.", "I coach a partner's technique.", "I run a session for a partner: warm-up, loads, spotting and feedback."]]},
 "Athletics": {
-  skills: [["motor", "Running", "Paces the distance"], ["motor", "Jumping", "Jumps for distance or height"], ["motor", "Throwing", "Throws with the whole body"], ["method", "Warming up and pacing", "Prepares for my events"], ["social", "Officiating", "Runs the event for others"]],
-  y78: [["Slows badly before the finish.", "Runs the distance at one pace.", "Paces the distance and drives through the line.", "Changes pace on purpose and finishes strongly."],
-        ["No run-up rhythm, take-off from the wrong foot.", "Runs up and takes off from one foot.", "Consistent run-up, take-off on the board, safe landing.", "Hits the board at speed and lands with the feet ahead."],
-        ["Throws with the arm only.", "Uses a side-on stance.", "Transfers weight from back foot to front with a clear release.", "Full sequence from legs to arm, lands inside the sector."],
-        ["Starts an event cold.", "Joins in the team warm-up.", "Completes a full warm-up and knows their target for the event.", "Leads a warm-up and manages effort across several events."],
-        ["Only waits for their own turn.", "Helps to measure or time with support.", "Times, measures or records accurately for the group.", "Runs an event station: order, results and safety."]],
-  y911: [["Runs the distance at one pace.", "Paces the distance and drives through the line.", "Changes pace on purpose and finishes strongly.", "Runs to a target time and adjusts the pace during the race."],
-         ["Runs up and takes off from one foot.", "Consistent run-up with take-off on the board.", "Hits the board at speed with the feet ahead on landing.", "Measured run-up, repeatable take-off, technique held at full speed."],
-         ["Uses a side-on stance.", "Transfers weight from back to front with a clear release.", "Full sequence from legs to arm, lands in the sector.", "Full technique with a glide, turn or approach, and consistent distance."],
-         ["Joins in the team warm-up.", "Completes a full warm-up and knows their target.", "Leads a warm-up and manages effort across events.", "Plans event-specific preparation and analyses their own results."],
-         ["Helps to measure or time with support.", "Records accurately for the group.", "Runs an event station.", "Officiates a full competition: rules, results, safety and timetable."]]},
+  skills: [["motor", "Pacing & Running", "Track"], ["motor", "Long Jump", "Field"], ["motor", "Javelin", "Field"], ["motor", "Relay (4x100m)", "Team"], ["method", "Warm-Up Leader", "I lead a 10-exercise warm-up"], ["social", "Officiating & Rules", "I time, measure and referee"]],
+  notes: ["Run with a tall posture, relaxed shoulders, and arms pumping at a 90-degree angle. Land lightly on the balls of your feet to stay fast. For pacing, know when to use max power (sprints) and when to save energy. In longer races, try to run at a steady speed (“even split”) or finish slightly faster than you started (“negative split”) so you don't run out of breath.",
+          "A great jump starts with a run-up that builds to your top controlled speed. Make your second-to-last step a bit longer to lower your hips, then strike the takeoff board quickly. While in the air, use your arms and legs to stay balanced. When landing, push your legs far in front of you, land on your heels, and always fall forward so you don't lose distance.",
+          "Hold the javelin firm and keep it pointed straight ahead. As you run, turn sideways and use cross-over steps. The most important move is the block: plant your front leg stiff on the ground to stop your body suddenly. This whips all your running speed into your chest and throwing arm. Release it high so it flies far and lands point-first.",
+          "Relay is about keeping the baton moving at top speed. The receiver must wait by their check-mark and start sprinting before their teammate reaches them. The pass must happen inside the 30-metre exchange zone. Use a “blind” pass: the receiver never looks back, but holds a steady hand out high when they hear their teammate yell “Hand!”",
+          "A good leader watches the clock and picks exactly 10 useful exercises. Your warm-up must have a clear build-up: start with light jogging to get the heart rate up, move into active stretches (like lunges or high knees), and finish with quick, powerful moves. Make sure each exercise feels a little harder and faster than the last one to get everyone race-ready.",
+          "Officials must be fair and focused. Timing: start the stopwatch exactly when the runner first moves, and stop it when their chest crosses the line. Jumping: watch the board closely for foot fouls, and measure from the takeoff line to the closest mark left in the sand. Track: watch for runners stepping on the inside lane line or passing the baton outside the 30m zone — both are forbidden."],
+  all: [["I run with poor form and get tired fast because I can't pace myself.", "My form is okay, but I struggle to pace myself for different distances.", "I use good running technique and adjust my pace well for both sprints and longer races.", "I run with highly efficient form and perfectly execute a pacing strategy for any distance."],
+        ["I struggle with the run-up and often foul or jump off the wrong foot.", "I can take off from the board, but I lose speed and lack height in the air.", "I sprint fast to the board, take off strongly, and land safely in the pit.", "I hit the board at top speed, drive my knees high, and execute a perfect landing to maximise distance."],
+        ["I throw the javelin like a ball, and it often lands flat or tail-first.", "I keep the javelin straight but struggle to use my body weight for power.", "I use a correct grip, pull from behind, and get the javelin to land point-first.", "I use a smooth run-up, strong block, and full body rotation for massive power and perfect flight."],
+        ["I often drop the baton or have to stop completely to pass it.", "I can pass the baton, but we slow down a lot during the exchange zone.", "I make smooth and safe baton passes while keeping a good running speed.", "I execute perfect, blind baton exchanges at a full sprint without losing any time."],
+        ["I ignore time limits, do fewer than 10 exercises, and don't increase intensity.", "I do 10 exercises on time, but the intensity stays the same instead of building up.", "I respect the time limit, lead 10 exercises, and gradually increase the intensity.", "I perfectly time 10 specific exercises, building smoothly to full competition intensity."],
+        ["I don't know what is forbidden and can't accurately time, measure, or check lanes.", "I know some rules, but I struggle or make mistakes when timing, measuring, or checking lanes.", "I know the rules and what is forbidden. I accurately time, measure, and referee my peers.", "I am an expert official. I accurately time, measure, referee lanes, and confidently enforce all rules."]]},
 "Swimming speed": {
-  skills: [["motor", "Stroke technique", "Keeps the stroke together"], ["motor", "Start and turn", "Starts and turns without stopping"], ["motor", "Speed", "Sprints the distance"], ["method", "Preparing to race", "Gets myself ready"], ["social", "Timing and lane discipline", "Shares the pool safely"]],
-  y78: [["Head up, uneven strokes.", "Swims 25m with a recognisable stroke.", "Streamlined body, regular breathing, full arm pull.", "Holds the stroke together at maximum effort."],
-        ["Enters feet first, stops at the wall.", "Push start, touches and stands at the turn.", "Dive start and a legal turn with no stop.", "Fast dive, tight turn, strong underwater push-off."],
-        ["Cannot hold the sprint for a length.", "Sprints one length.", "Sprints the full distance without losing form.", "Improves their own time and keeps technique at speed."],
-        ["Arrives late, no goggles or cap.", "Ready with the right kit.", "Warms up in the water and knows their target time.", "Uses warm-up and pacing to beat a personal best."],
-        ["Blocks the lane.", "Swims in the right lane when reminded.", "Keeps lane order and times a partner accurately.", "Organises the lane and gives a team-mate feedback on their time."]],
-  y911: [["Swims 25m with a recognisable stroke.", "Streamlined, regular breathing, full arm pull.", "Holds the stroke together at maximum effort.", "Efficient technique in two strokes at race pace."],
-         ["Push start, stands at the turn.", "Dive start and a legal turn with no stop.", "Fast dive, tight turn, strong push-off.", "Racing start and turn with a streamlined underwater phase to the 5m mark."],
-         ["Sprints one length.", "Sprints the full distance without losing form.", "Improves their time and keeps technique at speed.", "Races to a split time and holds form over repeated efforts."],
-         ["Ready with the right kit.", "Warms up in the water and knows their target time.", "Uses warm-up and pacing to beat a personal best.", "Plans a full race preparation and reviews the performance against the time."],
-         ["Swims in the right lane.", "Keeps lane order and times a partner.", "Organises the lane and feeds back on times.", "Runs a lane session: sets, timing, feedback and safety."]]},
+  skills: [["motor", "Stroke technique", "I keep the stroke together"], ["motor", "Start and turn", "I start and turn without stopping"], ["motor", "Speed", "I sprint the distance"], ["method", "Preparing to race", "I get myself ready"], ["social", "Timing and lane discipline", "I share the pool safely"]],
+  y78: [["I swim with my head up and uneven strokes.", "I swim 25m with a recognisable stroke.", "I keep a streamlined body, breathe regularly and pull fully with my arms.", "I hold the stroke together at maximum effort."],
+        ["I enter feet first and stop at the wall.", "I push start, touch the wall and stand up at the turn.", "I dive start and turn legally without stopping.", "I dive fast, turn tight and push off strongly underwater."],
+        ["I cannot hold the sprint for a whole length.", "I sprint one length.", "I sprint the full distance without losing form.", "I improve my own time and keep technique at speed."],
+        ["I arrive late, no goggles or cap.", "I am ready with the right kit.", "I warm up in the water and know my target time.", "I use warm-up and pacing to beat a personal best."],
+        ["I block the lane.", "I swim in the right lane when reminded.", "I keep lane order and time a partner accurately.", "I organise the lane and give a team-mate feedback on my time."]],
+  y911: [["I swim 25m with a recognisable stroke.", "I stay streamlined, breathe regularly and pull fully with my arms.", "I hold the stroke together at maximum effort.", "I keep an efficient technique in two strokes at race pace."],
+         ["I push start and stand up at the turn.", "I dive start and turn legally without stopping.", "I dive fast, turn tight and push off strongly.", "I use a racing start and turn with a streamlined underwater phase to the 5m mark."],
+         ["I sprint one length.", "I sprint the full distance without losing form.", "I improve my time and keep technique at speed.", "I race to a split time and hold form over repeated efforts."],
+         ["I am ready with the right kit.", "I warm up in the water and know my target time.", "I use warm-up and pacing to beat a personal best.", "I plan a full race preparation and review my performance against the time."],
+         ["I swim in the right lane.", "I keep lane order and time a partner.", "I organise the lane and feed back on times.", "I run a lane session: sets, timing, feedback and safety."]]},
 "Swimming endurance": {
-  skills: [["motor", "Sustained swimming", "Keeps going without stopping"], ["motor", "Efficiency", "Swims further for less effort"], ["motor", "Breathing and pacing", "Holds an even pace"], ["method", "Tracking my endurance", "Knows what I have done"], ["social", "Swimming with others", "Works with the lane"]],
-  y78: [["Stops after one length.", "Swims 100m with stops.", "Swims continuously for the whole set time.", "Swims continuously and increases the distance."],
-        ["Short frantic strokes, very high effort.", "Counts strokes with help.", "Long even strokes with a steady stroke count.", "Keeps the stroke count low and even as tiredness arrives."],
-        ["Lifts the head and breathes when panicking.", "Breathes to one side in a pattern.", "Even pace and a regular breathing pattern throughout.", "Controls the pace on purpose across the whole swim."],
-        ["Does not know the distance covered.", "Counts lengths with help.", "Records distance and time each session.", "Sets and reaches a distance target using the record."],
-        ["Swims alone and ignores the group.", "Follows the lead swimmer.", "Shares the lane and takes a turn leading.", "Paces a slower swimmer and encourages them to finish."]],
-  y911: [["Swims 100m with stops.", "Swims continuously for the whole set time.", "Swims continuously and increases the distance.", "Completes a long continuous swim at a controlled pace."],
-         ["Counts strokes with help.", "Long even strokes with a steady count.", "Keeps the stroke count low as tiredness arrives.", "Improves distance per stroke and uses it to swim further for the same effort."],
-         ["Breathes to one side in a pattern.", "Even pace and a regular breathing pattern.", "Controls the pace on purpose across the swim.", "Swims an even or negative split and breathes bilaterally under fatigue."],
-         ["Counts lengths with help.", "Records distance and time each session.", "Sets and reaches a target using the record.", "Plans a training block and uses the data to adjust it."],
-         ["Follows the lead swimmer.", "Shares the lane and takes a turn leading.", "Paces a slower swimmer.", "Leads a lane: sets the pace, manages the intervals and includes everyone."]]},
+  skills: [["motor", "Sustained swimming", "I keep going without stopping"], ["motor", "Efficiency", "I swim further for less effort"], ["motor", "Breathing and pacing", "I hold an even pace"], ["method", "Tracking my endurance", "I know what I have done"], ["social", "Swimming with others", "I work with the lane"]],
+  y78: [["I stop after one length.", "I swim 100m with stops.", "I swim continuously for the whole set time.", "I swim continuously and increase the distance."],
+        ["I swim short frantic strokes with very high effort.", "I count strokes with help.", "I swim long even strokes with a steady stroke count.", "I keep the stroke count low and even as tiredness arrives."],
+        ["I lift the head and breathe when panicking.", "I breathe to one side in a pattern.", "I hold an even pace and a regular breathing pattern throughout.", "I control the pace on purpose across the whole swim."],
+        ["I do not know the distance covered.", "I count lengths with help.", "I record distance and time each session.", "I set and reach a distance target using the record."],
+        ["I swim alone and ignore the group.", "I follow the lead swimmer.", "I share the lane and take a turn leading.", "I pace a slower swimmer and encourage me to finish."]],
+  y911: [["I swim 100m with stops.", "I swim continuously for the whole set time.", "I swim continuously and increase the distance.", "I complete a long continuous swim at a controlled pace."],
+         ["I count strokes with help.", "I swim long even strokes with a steady count.", "I keep the stroke count low as tiredness arrives.", "I improve distance per stroke and use it to swim further for the same effort."],
+         ["I breathe to one side in a pattern.", "I hold an even pace and a regular breathing pattern.", "I control the pace on purpose across the swim.", "I swim an even or negative split and breathe bilaterally under fatigue."],
+         ["I count lengths with help.", "I record distance and time each session.", "I set and reach a target using the record.", "I plan a training block and use the data to adjust it."],
+         ["I follow the lead swimmer.", "I share the lane and take a turn leading.", "I pace a slower swimmer.", "I lead a lane: I set the pace, manage the intervals and include everyone."]]},
 "Handball": {
-  skills: [["motor", "Passing and catching", "Keeps the ball moving"], ["motor", "Shooting", "Scores from a real position"], ["motor", "Defending", "Stops the attack"], ["method", "Preparing and rules", "Ready and knows the game"], ["social", "Refereeing and roles", "Takes a role for the group"]],
-  y78: [["Drops the ball and passes to nobody.", "Catches a chest pass and returns it standing.", "Accurate passes on the move, catches under pressure.", "Chooses the right pass \\u2014 bounce, lob, quick \\u2014 under pressure."],
-        ["Throws with no set-up.", "Shoots on goal from standing.", "Jump shot from the 9m line, aims for a corner.", "Shoots accurately under pressure into the space the keeper leaves."],
-        ["Stands still and watches.", "Marks a player near the ball.", "Stays between attacker and goal, blocks the shooting arm.", "Works with the defensive line, intercepts and starts the counter."],
-        ["Unclear on the basic rules.", "Knows the steps and dribble rules.", "Warms the shoulder up properly and applies the rules in play.", "Leads a warm-up and adapts a drill for the group."],
-        ["Takes no role.", "Keeps the score with help.", "Referees a small game: steps, double dribble, fouls.", "Referees confidently and explains decisions calmly."]],
-  y911: [["Catches a chest pass and returns it standing.", "Accurate passes on the move.", "Chooses the right pass under pressure.", "Keeps possession under real defensive pressure and switches the point of attack."],
-         ["Shoots on goal from standing.", "Jump shot from the 9m line aimed at a corner.", "Shoots accurately under pressure.", "Varies shot type and placement to beat a keeper in a game."],
-         ["Marks a player near the ball.", "Stays between attacker and goal.", "Works with the defensive line and intercepts.", "Organises the defence, calls the switches and starts the counter-attack."],
-         ["Knows the steps and dribble rules.", "Warms up properly and applies the rules in play.", "Leads a warm-up and adapts a drill.", "Designs a practice for a team weakness and explains the tactic."],
-         ["Keeps the score.", "Referees a small game.", "Referees confidently and explains decisions.", "Referees a full game and manages both teams and the scoring table."]]},
+  skills: [["motor", "Passing and catching", "I keep the ball moving"], ["motor", "Shooting", "I score from a real position"], ["motor", "Defending", "I stop the attack"], ["method", "Preparing and rules", "I am ready and know the game"], ["social", "Refereeing and roles", "I take a role for the group"]],
+  y78: [["I drop the ball and pass to nobody.", "I catch a chest pass and return it standing.", "I pass accurately on the move and catch under pressure.", "I choose the right pass \\u2014 bounce, lob, quick \\u2014 under pressure."],
+        ["I throw with no set-up.", "I shoot on goal from standing.", "I jump shot from the 9m line and aim for a corner.", "I shoot accurately under pressure into the space the keeper leaves."],
+        ["I stand still and watch.", "I mark a player near the ball.", "I stay between attacker and goal and block the shooting arm.", "I work with the defensive line, intercept and start the counter."],
+        ["I am unclear on the basic rules.", "I know the steps and dribble rules.", "I warm the shoulder up properly and apply the rules in play.", "I lead a warm-up and adapt a drill for the group."],
+        ["I take no role.", "I keep the score with help.", "I referee a small game: steps, double dribble, fouls.", "I referee confidently and explain decisions calmly."]],
+  y911: [["I catch a chest pass and return it standing.", "I pass accurately on the move.", "I choose the right pass under pressure.", "I keep possession under real defensive pressure and switch the point of attack."],
+         ["I shoot on goal from standing.", "I jump shot from the 9m line and aim at a corner.", "I shoot accurately under pressure.", "I vary shot type and placement to beat a keeper in a game."],
+         ["I mark a player near the ball.", "I stay between attacker and goal.", "I work with the defensive line and intercept.", "I organise the defence, call the switches and start the counter-attack."],
+         ["I know the steps and dribble rules.", "I warm up properly and apply the rules in play.", "I lead a warm-up and adapt a drill.", "I design a practice for a team weakness and explain the tactic."],
+         ["I keep the score.", "I referee a small game.", "I referee confidently and explain decisions.", "I referee a full game and manage both teams and the scoring table."]]},
 "Volleyball": {
-  skills: [["motor", "Serve", "Starts the rally"], ["motor", "Dig and set", "Controls the first two touches"], ["motor", "Attack and rally", "Builds the point"], ["method", "Court position and safety", "Knows where to be"], ["social", "Refereeing and team spirit", "Keeps the game going"]],
-  y78: [["The serve does not reach the net.", "Underarm serve lands in court.", "Consistent serve in, aimed at a zone.", "Overarm serve with placement and pace."],
-        ["Hits the ball anywhere with one hand.", "Dig with two hands, the ball goes up.", "Controlled dig and set to a target.", "Accurate first touch under pressure that sets up the attack."],
-        ["Sends the ball straight back on the first touch.", "Keeps the rally going.", "Uses three touches: dig, set, attack.", "Attacks into space or spikes with direction."],
-        ["Does not know where to stand.", "Holds their position when reminded.", "Rotates correctly and calls for the ball.", "Organises the rotation and adjusts the team\\u2019s position."],
-        ["Blames team-mates for errors.", "Keeps the score.", "Referees a rally: lines, faults, rotation.", "Referees confidently and keeps the team positive after mistakes."]],
-  y911: [["Underarm serve lands in court.", "Consistent serve aimed at a zone.", "Overarm serve with placement and pace.", "Serves tactically at the weakest receiver under pressure."],
-         ["Dig with two hands, the ball goes up.", "Controlled dig and set to a target.", "Accurate first touch under pressure.", "Consistent platform and hands that build an attack from a hard serve."],
-         ["Keeps the rally going.", "Uses three touches.", "Attacks into space or spikes with direction.", "Attacks with an approach and timing, and covers the block."],
-         ["Holds their position when reminded.", "Rotates correctly and calls for the ball.", "Organises the rotation.", "Runs a team system and adjusts it to the opponent."],
-         ["Keeps the score.", "Referees a rally.", "Referees confidently and keeps the team positive.", "Referees a full set with signals and manages the scoresheet."]]},
+  skills: [["motor", "Serve", "I start the rally"], ["motor", "Dig and set", "I control the first two touches"], ["motor", "Attack and rally", "I build the point"], ["method", "Court position and safety", "I know where to be"], ["social", "Refereeing and team spirit", "I keep the game going"]],
+  y78: [["My serve does not reach the net.", "My underarm serve lands in court.", "I serve in every time and aim at a zone.", "I serve overarm with placement and pace."],
+        ["I hit the ball anywhere with one hand.", "I dig with two hands and the ball goes up.", "I dig and set to a target under control.", "My first touch is accurate under pressure and sets up the attack."],
+        ["I send the ball straight back on the first touch.", "I keep the rally going.", "I use three touches: dig, set, attack.", "I attack into space or spike with direction."],
+        ["I do not know where to stand.", "I hold my position when reminded.", "I rotate correctly and call for the ball.", "I organise the rotation and adjust the team\\u2019s position."],
+        ["I blame team-mates for errors.", "I keep the score.", "I referee a rally: lines, faults, rotation.", "I referee confidently and keep the team positive after mistakes."]],
+  y911: [["My underarm serve lands in court.", "I serve in every time and aim at a zone.", "I serve overarm with placement and pace.", "I serve tactically at the weakest receiver under pressure."],
+         ["I dig with two hands and the ball goes up.", "I dig and set to a target under control.", "My first touch is accurate under pressure.", "My platform and hands are steady enough to build an attack from a hard serve."],
+         ["I keep the rally going.", "I use three touches.", "I attack into space or spike with direction.", "I attack with an approach and timing, and cover the block."],
+         ["I hold my position when reminded.", "I rotate correctly and call for the ball.", "I organise the rotation.", "I run a team system and adjust it to the opponent."],
+         ["I keep the score.", "I referee a rally.", "I referee confidently and keep the team positive.", "I referee a full set with signals and manage the scoresheet."]]},
 "Basketball": {
-  skills: [["motor", "Ball handling", "Keeps the ball while moving"], ["motor", "Shooting", "Scores from a realistic position"], ["motor", "Moving without the ball", "Creates and closes space"], ["method", "Preparing my own practice", "Ready, safe and self-reliant"], ["social", "Refereeing and team roles", "Takes a role for the group"]],
-  y78: [["Loses control when moving and looks down at the ball.", "Dribbles with the strong hand, head up in short bursts.", "Dribbles both hands, head up, protects the ball under light pressure.", "Changes hand, speed and direction under real pressure."],
-        ["Throws at the basket with no set position.", "Correct hand position, scores close in when unopposed.", "Scores a lay-up on the strong side and a set shot from the key.", "Chooses the right shot for the situation and scores under pressure."],
-        ["Stands still and waits for the ball.", "Moves into space after passing, but only near the ball.", "Creates a passing line and stays between player and basket.", "Reads the game: cuts, screens and switches marking to help."],
-        ["Arrives without kit and waits to be told everything.", "Ready on time, joins the warm-up when reminded.", "Ready in kit, warms up properly, checks the space is safe.", "Leads part of the warm-up and adapts a drill to their level."],
-        ["Watches without taking a role.", "Keeps the score or times with help.", "Referees a small game: travel, double dribble, fouls, restarts.", "Referees confidently and coaches team-mates."]],
-  y911: [["Dribbles with the strong hand, head up in bursts.", "Both hands, head up, protects the ball under light pressure.", "Changes hand, speed and direction under real pressure.", "Keeps the ball under full-court pressure and creates an advantage from the dribble."],
-         ["Correct hand position, scores close in unopposed.", "Lay-up on the strong side and a set shot from the key.", "Chooses the right shot and scores under pressure.", "Scores consistently from range and off the dribble in a game."],
-         ["Moves into space after passing.", "Creates a passing line and stays between player and basket.", "Cuts, screens and switches marking to help.", "Reads the defence, runs a team pattern, boxes out and rebounds."],
-         ["Ready on time and joins the warm-up.", "Warms up properly and checks the space is safe.", "Leads part of the warm-up and adapts a drill.", "Designs a practice for a weakness and explains the tactic behind it."],
-         ["Keeps the score or times.", "Referees a small game.", "Referees confidently and coaches team-mates.", "Referees a full game and manages the table and the teams."]]},
+  skills: [["motor", "Ball handling", "I keep the ball while moving"], ["motor", "Shooting", "I score from a realistic position"], ["motor", "Moving without the ball", "I create and closes space"], ["method", "Preparing my own practice", "I am ready, safe and self-reliant"], ["social", "Refereeing and team roles", "I take a role for the group"]],
+  y78: [["I lose control when moving and look down at the ball.", "I dribble with the strong hand, head up in short bursts.", "I dribble with both hands, head up, and protect the ball under light pressure.", "I change hand, speed and direction under real pressure."],
+        ["I throw at the basket with no set position.", "I use the correct hand position and score close in when nobody defends.", "I score a lay-up on the strong side and a set shot from the key.", "I choose the right shot for the situation and score under pressure."],
+        ["I stand still and wait for the ball.", "I move into space after passing, but only near the ball.", "I create a passing line and stay between player and basket.", "I read the game: I cut, screen and switch marking to help."],
+        ["I arrive without kit and wait to be told everything.", "I am ready on time and join the warm-up when I am reminded.", "I am ready in kit, warm up properly and check the space is safe.", "I lead part of the warm-up and adapt a drill to my level."],
+        ["I watch without taking a role.", "I keep the score or time with help.", "I referee a small game: travel, double dribble, fouls, restarts.", "I referee confidently and coach team-mates."]],
+  y911: [["I dribble with the strong hand, head up in bursts.", "I dribble with both hands, head up, and protect the ball under light pressure.", "I change hand, speed and direction under real pressure.", "I keep the ball under full-court pressure and create an advantage from the dribble."],
+         ["I use the correct hand position and score close in when nobody defends.", "I score a lay-up on my strong side and a set shot from the key.", "I choose the right shot and score under pressure.", "I score consistently from range and off the dribble in a game."],
+         ["I move into space after passing.", "I create a passing line and stay between player and basket.", "I cut, screen and switch marking to help.", "I read the defence, run a team pattern, box out and rebound."],
+         ["I am ready on time and join the warm-up.", "I warm up properly and check the space is safe.", "I lead part of the warm-up and adapt a drill.", "I design a practice for a weakness and explain the tactic behind it."],
+         ["I keep the score or time.", "I referee a small game.", "I referee confidently and coach team-mates.", "I referee a full game and manage the table and the teams."]]},
 "Badminton": {
-  skills: [["motor", "Serve", "Starts the rally legally"], ["motor", "Overhead and clear", "Hits from the back court"], ["motor", "Movement and recovery", "Covers the court"], ["method", "Warming up and scoring", "Runs my own game"], ["social", "Fair play and umpiring", "Calls it honestly"]],
-  y78: [["The serve rarely lands in.", "Low serve lands in the service box.", "Consistent low serve, uses a high serve when needed.", "Varies the serve to attack the opponent\\u2019s position."],
-        ["Faces the net, no power.", "Overhead hits reach mid-court.", "Side-on overhead clear to the back of the court.", "Disguises clear, drop and smash from the same set-up."],
-        ["Stands still and reaches for the shuttle.", "Moves to the shuttle late.", "Moves to the shuttle and returns to base every time.", "Split-step and lunge, always ready for the next shot."],
-        ["Plays without warming up.", "Warms up shoulders and wrists.", "Warms up properly and scores their own game correctly.", "Organises a match and practises their weakest shot on purpose."],
-        ["Argues about calls.", "Accepts the calls.", "Calls the lines honestly and umpires a game.", "Umpires, manages a court rotation and encourages other players."]],
-  y911: [["Low serve lands in the service box.", "Consistent low serve, high serve when needed.", "Varies the serve to attack the opponent's position.", "Uses the serve and third shot as a planned tactic in singles and doubles."],
-         ["Overhead hits reach mid-court.", "Side-on clear to the back of the court.", "Disguises clear, drop and smash.", "Attacks with a smash and defends the reply, controlling the rally."],
-         ["Moves to the shuttle late.", "Returns to base every time.", "Split-step and lunge, ready for the next shot.", "Moves efficiently around the whole court through a long rally."],
-         ["Warms up shoulders and wrists.", "Scores their own game correctly.", "Practises their weakest shot on purpose.", "Plans a tactic against an opponent and reviews it after the match."],
-         ["Accepts the calls.", "Calls the lines honestly and umpires.", "Umpires and manages a court rotation.", "Runs a tournament round: draw, scoring and timings."]]},
+  skills: [["motor", "Serve", "I start the rally legally"], ["motor", "Overhead and clear", "I hit from the back court"], ["motor", "Movement and recovery", "I cover the court"], ["method", "Warming up and scoring", "I run my own game"], ["social", "Fair play and umpiring", "I call it honestly"]],
+  y78: [["My serve rarely lands in.", "My low serve lands in the service box.", "I serve low every time and use a high serve when I need it.", "I vary the serve to attack the opponent\\u2019s position."],
+        ["I face the net, no power.", "My overhead hits reach mid-court.", "I hit a side-on overhead clear to the back of the court.", "I disguise clear, drop and smash from the same set-up."],
+        ["I stand still and reach for the shuttle.", "I move to the shuttle late.", "I move to the shuttle and return to base every time.", "I split-step and lunge, always ready for the next shot."],
+        ["I play without warming up.", "I warm up shoulders and wrists.", "I warm up properly and score my own game correctly.", "I organise a match and practise my weakest shot on purpose."],
+        ["I argue about calls.", "I accept the calls.", "I call the lines honestly and umpire a game.", "I umpire, manage a court rotation and encourage other players."]],
+  y911: [["My low serve lands in the service box.", "I serve low every time and use a high serve when I need it.", "I vary the serve to attack the opponent's position.", "I use the serve and third shot as a planned tactic in singles and doubles."],
+         ["My overhead hits reach mid-court.", "I hit a side-on clear to the back of the court.", "I disguise clear, drop and smash.", "I attack with a smash and defend the reply, controlling the rally."],
+         ["I move to the shuttle late.", "I return to base every time.", "I split-step and lunge, ready for the next shot.", "I move efficiently around the whole court through a long rally."],
+         ["I warm up shoulders and wrists.", "I score my own game correctly.", "I practise my weakest shot on purpose.", "I plan a tactic against an opponent and review it after the match."],
+         ["I accept the calls.", "I call the lines honestly and umpire.", "I umpire and manage a court rotation.", "I run a tournament round: draw, scoring and timings."]]},
 "Pickleball": {
-  skills: [["motor", "Serve and return", "Starts the point"], ["motor", "Drives and dinks", "Controls the ball"], ["motor", "Positioning", "Stands in the right place"], ["method", "Rules and set-up", "Runs the court"], ["social", "Doubles partnership", "Plays as a pair"]],
-  y78: [["Serve does not clear the net or goes long.", "Underarm serve lands in the diagonal court.", "Consistent deep serve and return.", "Places serve and return deep to move the opponent."],
-        ["Swings hard at every ball.", "Returns the ball over the net from the baseline.", "Controls a soft dink into the kitchen.", "Mixes drive and dink to build the point."],
-        ["Stands in the kitchen or wanders.", "Stays behind the kitchen line when reminded.", "Moves up to the kitchen line after the third shot.", "Moves as a pair with a partner and covers the middle."],
-        ["Unsure of the rules.", "Knows the double-bounce and kitchen rules.", "Sets up net and court and scores correctly.", "Explains the rules to a new player and runs a rotation."],
-        ["Plays alone inside the pair.", "Calls \\u201cmine\\u201d sometimes.", "Communicates on every ball and covers for the partner.", "Leads the pair\\u2019s tactics and keeps the partner confident."]],
-  y911: [["Underarm serve lands in the diagonal court.", "Consistent deep serve and return.", "Places both deep to move the opponent.", "Serves and returns with pace or spin as part of a plan."],
-         ["Returns the ball from the baseline.", "Controls a dink into the kitchen.", "Mixes drive and dink to build the point.", "Wins the dink rally with patience, then attacks the high ball."],
-         ["Stays behind the kitchen line.", "Moves up to the kitchen line after the third shot.", "Moves as a pair and covers the middle.", "Uses the third-shot drop to take the net as a team."],
-         ["Knows the double-bounce and kitchen rules.", "Sets up the court and scores correctly.", "Explains the rules to a new player.", "Runs a round-robin: draw, scoring and court rotation."],
-         ["Calls \"mine\" sometimes.", "Communicates on every ball.", "Leads the pair's tactics.", "Adapts the pair's tactics mid-game and keeps the partner effective."]]},
+  skills: [["motor", "Serve and return", "I start the point"], ["motor", "Drives and dinks", "I control the ball"], ["motor", "Positioning", "I stand in the right place"], ["method", "Rules and set-up", "I run the court"], ["social", "Doubles partnership", "I play as a pair"]],
+  y78: [["My serve does not clear the net, or it goes long.", "My underarm serve lands in the diagonal court.", "I serve and return deep every time.", "I place serve and return deep to move the opponent."],
+        ["I swing hard at every ball.", "I return the ball over the net from the baseline.", "I control a soft dink into the kitchen.", "I mix drive and dink to build the point."],
+        ["I stand in the kitchen or wander.", "I stay behind the kitchen line when reminded.", "I move up to the kitchen line after the third shot.", "I move as a pair with a partner and cover the middle."],
+        ["I am unsure of the rules.", "I know the double-bounce and kitchen rules.", "I set up net and court and score correctly.", "I explain the rules to a new player and run a rotation."],
+        ["I play alone inside the pair.", "I call \\u201cmine\\u201d sometimes.", "I communicate on every ball and cover for the partner.", "I lead the pair\\u2019s tactics and keep the partner confident."]],
+  y911: [["My underarm serve lands in the diagonal court.", "I serve and return deep every time.", "I place both deep to move the opponent.", "I serve and return with pace or spin as part of a plan."],
+         ["I return the ball from the baseline.", "I control a dink into the kitchen.", "I mix drive and dink to build the point.", "I win the dink rally with patience, then attack the high ball."],
+         ["I stay behind the kitchen line.", "I move up to the kitchen line after the third shot.", "I move as a pair and cover the middle.", "I use the third-shot drop to take the net as a team."],
+         ["I know the double-bounce and kitchen rules.", "I set up the court and score correctly.", "I explain the rules to a new player.", "I run a round-robin: draw, scoring and court rotation."],
+         ["I call \"mine\" sometimes.", "I communicate on every ball.", "I lead the pair's tactics.", "I adapt the pair's tactics mid-game and keep the partner effective."]]},
 "Rugby": {
-  skills: [["motor", "Handling", "Passes and catches on the move"], ["motor", "Running with the ball", "Attacks the space"], ["motor", "Defending", "Stops the attack"], ["method", "Warm-up and safety", "Plays the game safely"], ["social", "Refereeing and team roles", "Takes a role for the group"]],
-  y78: [["Drops the ball and passes forward.", "Catches and passes with two hands standing still.", "Passes both ways on the move with hands in front.", "Draws the defender and passes at the right moment."],
-        ["Runs into contact or into the crowd.", "Runs straight into space.", "Changes pace and angle to beat a defender.", "Attacks the gap and offloads or scores."],
-        ["Avoids defending.", "Moves towards the attacker.", "Stays in the defensive line and makes the touch or tackle.", "Organises the line, pushes up together and forces the error."],
-        ["Plays without preparing.", "Completes the warm-up with the group.", "Warms up properly and knows the safety rules.", "Leads a warm-up and adapts a game to keep it safe."],
-        ["Takes no role.", "Counts the touches.", "Referees a small game: forward pass, offside, touch count.", "Referees confidently and manages the teams fairly."]],
-  y911: [["Catches and passes with two hands standing still.", "Passes both ways on the move.", "Draws the defender and passes at the right moment.", "Passes accurately off both hands at speed under pressure."],
-         ["Runs straight into space.", "Changes pace and angle to beat a defender.", "Attacks the gap and offloads or scores.", "Runs a line off a team-mate and creates space for others."],
-         ["Moves towards the attacker.", "Stays in the line and makes the touch or tackle.", "Organises the line and pushes up together.", "Reads the attack, calls the shift and forces the error."],
-         ["Completes the warm-up with the group.", "Warms up properly and knows the safety rules.", "Leads a warm-up and adapts a game.", "Designs a practice for a weakness and explains the tactic."],
-         ["Counts the touches.", "Referees a small game.", "Referees confidently and manages the teams.", "Referees a full game, applies advantage and manages both captains."]]},
+  skills: [["motor", "Handling", "I pass and catch on the move"], ["motor", "Running with the ball", "I attack the space"], ["motor", "Defending", "I stop the attack"], ["method", "Warm-up and safety", "I play the game safely"], ["social", "Refereeing and team roles", "I take a role for the group"]],
+  y78: [["I drop the ball and pass forward.", "I catch and pass with two hands standing still.", "I pass both ways on the move with hands in front.", "I draw the defender and pass at the right moment."],
+        ["I run into contact or into the crowd.", "I run straight into space.", "I change pace and angle to beat a defender.", "I attack the gap and offload or score."],
+        ["I avoid defending.", "I move towards the attacker.", "I stay in the defensive line and make the touch or tackle.", "I organise the line, push up together and force the error."],
+        ["I play without preparing.", "I complete the warm-up with the group.", "I warm up properly and know the safety rules.", "I lead a warm-up and adapt a game to keep it safe."],
+        ["I take no role.", "I count the touches.", "I referee a small game: forward pass, offside, touch count.", "I referee confidently and manage the teams fairly."]],
+  y911: [["I catch and pass with two hands standing still.", "I pass both ways on the move.", "I draw the defender and pass at the right moment.", "I pass accurately off both hands at speed under pressure."],
+         ["I run straight into space.", "I change pace and angle to beat a defender.", "I attack the gap and offload or score.", "I run a line off a team-mate and create space for others."],
+         ["I move towards the attacker.", "I stay in the line and make the touch or tackle.", "I organise the line and push up together.", "I read the attack, call the shift and force the error."],
+         ["I complete the warm-up with the group.", "I warm up properly and know the safety rules.", "I lead a warm-up and adapt a game.", "I design a practice for a weakness and explain the tactic."],
+         ["I count the touches.", "I referee a small game.", "I referee confidently and manage the teams.", "I referee a full game, applies advantage and manage both captains."]]},
 "Ultimate frisbee": {
-  skills: [["motor", "Throwing", "Delivers an accurate disc"], ["motor", "Catching", "Secures the disc"], ["motor", "Cutting and defending", "Creates and denies space"], ["method", "Rules and self-officiating", "Applies the rules myself"], ["social", "Spirit of the game", "Plays fairly"]],
-  y78: [["The disc does not reach a team-mate.", "Backhand throw over 10m.", "Backhand and forehand accurately to a moving player.", "Chooses the throw that beats the marker and leads the receiver."],
-        ["Drops most discs.", "Catches a slow disc against the body.", "Two-handed catch on the move.", "Catches under pressure and in the air."],
-        ["Stands still and calls for the disc.", "Runs towards the thrower.", "Cuts into space and clears out when not used.", "Times the cut, marks a player and forces one side."],
-        ["Unsure of the rules.", "Knows travelling and the stall count.", "Applies the rules in play and calls the stall count.", "Settles a call calmly with the other team using the rules."],
-        ["Argues or plays unfairly.", "Accepts decisions.", "Plays fairly and encourages both teams.", "Leads on spirit: settles disputes and includes everyone."]],
-  y911: [["Backhand throw over 10m.", "Backhand and forehand to a moving player.", "Chooses the throw that beats the marker.", "Throws accurately into space under a hard mark, including a break-side throw."],
-         ["Catches a slow disc against the body.", "Two-handed catch on the move.", "Catches under pressure and in the air.", "Wins a contested disc and secures possession."],
-         ["Runs towards the thrower.", "Cuts into space and clears out.", "Times the cut, marks and forces one side.", "Works within a team offence and defence, switching and covering."],
-         ["Knows travelling and the stall count.", "Applies the rules and calls the stall count.", "Settles a call calmly using the rules.", "Explains and applies the rules to resolve a disputed call for both teams."],
-         ["Accepts decisions.", "Plays fairly and encourages both teams.", "Leads on spirit.", "Captains the team on spirit: sets the tone, debriefs and scores the other team fairly."]]},
+  skills: [["motor", "Throwing", "I deliver an accurate disc"], ["motor", "Catching", "I secure the disc"], ["motor", "Cutting and defending", "I create and denies space"], ["method", "Rules and self-officiating", "I apply the rules myself"], ["social", "Spirit of the game", "I play fairly"]],
+  y78: [["My disc does not reach a team-mate.", "I throw a backhand over 10m.", "I throw backhand and forehand accurately to a moving player.", "I choose the throw that beats the marker and lead the receiver."],
+        ["I drop most discs.", "I catch a slow disc against the body.", "I catch two-handed on the move.", "I catch under pressure and in the air."],
+        ["I stand still and call for the disc.", "I run towards the thrower.", "I cut into space and clear out when not used.", "I time the cut, marks a player and force one side."],
+        ["I am unsure of the rules.", "I know travelling and the stall count.", "I apply the rules in play and call the stall count.", "I settle a call calmly with the other team using the rules."],
+        ["I argue or play unfairly.", "I accept decisions.", "I play fairly and encourage both teams.", "I lead on spirit: I settle disputes and include everyone."]],
+  y911: [["I throw a backhand over 10m.", "I throw backhand and forehand to a moving player.", "I choose the throw that beats the marker.", "I throw accurately into space under a hard mark, including a break-side throw."],
+         ["I catch a slow disc against the body.", "I catch two-handed on the move.", "I catch under pressure and in the air.", "I win a contested disc and secure possession."],
+         ["I run towards the thrower.", "I cut into space and clear out.", "I time the cut, marks and force one side.", "I work within a team offence and defence, switching and covering."],
+         ["I know travelling and the stall count.", "I apply the rules and call the stall count.", "I settle a call calmly using the rules.", "I explain and apply the rules to resolve a disputed call for both teams."],
+         ["I accept decisions.", "I play fairly and encourage both teams.", "I lead on spirit.", "I captain the team on spirit: sets the tone, debriefs and score the other team fairly."]]},
 "Fitness": {
-  skills: [["motor", "Cardiovascular endurance", "Keeps working for longer"], ["motor", "Strength and muscular endurance", "Repeats with good form"], ["motor", "Flexibility and mobility", "Moves through full range"], ["method", "Testing and target setting", "Uses my own results"], ["social", "Partner work", "Helps a partner train"]],
-  y78: [["Stops early in a continuous effort.", "Works continuously for a short time.", "Sustains the effort for the whole set time.", "Sustains the effort and improves the score or distance."],
-        ["Form breaks in the first few reps.", "Completes the reps with support or half range.", "Completes all the reps with correct form.", "Increases reps or load while keeping the form."],
-        ["Avoids stretching.", "Copies the stretches.", "Holds each stretch for the full time in the right position.", "Chooses stretches for the muscles used and improves their range."],
-        ["Does not know their scores.", "Completes a fitness test with help.", "Records the test scores and sets one target.", "Uses the results to plan the next block of training."],
-        ["Distracts others.", "Counts for a partner.", "Counts, times and encourages a partner accurately.", "Leads a station, corrects technique and adjusts it to the partner."]],
-  y911: [["Works continuously for a short time.", "Sustains the effort for the whole set time.", "Sustains the effort and improves the score.", "Trains in a target heart-rate zone and improves a measured test result."],
-         ["Completes the reps with support or half range.", "Completes all the reps with correct form.", "Increases reps or load while keeping the form.", "Trains at a set intensity and progresses safely across a block."],
-         ["Copies the stretches.", "Holds each stretch for the full time.", "Chooses stretches for the muscles used.", "Uses dynamic and static work at the right point in the session and explains why."],
-         ["Completes a fitness test with help.", "Records the scores and sets a target.", "Uses the results to plan the next block.", "Designs a personal programme from the training principles and evaluates it."],
-         ["Counts for a partner.", "Counts, times and encourages accurately.", "Leads a station and corrects technique.", "Leads a full circuit for a group: timing, technique, safety and adaptation."]]},
+  skills: [["motor", "Cardiovascular endurance", "I keep working for longer"], ["motor", "Strength and muscular endurance", "I repeat with good form"], ["motor", "Flexibility and mobility", "I move through full range"], ["method", "Testing and target setting", "I use my own results"], ["social", "Partner work", "I help a partner train"]],
+  y78: [["I stop early in a continuous effort.", "I work continuously for a short time.", "I sustain the effort for the whole set time.", "I sustain the effort and improve the score or distance."],
+        ["My form breaks in the first few reps.", "I complete the reps with support or half range.", "I complete all the reps with correct form.", "I increase reps or load while keeping the form."],
+        ["I avoid stretching.", "I copy the stretches.", "I hold each stretch for the full time in the right position.", "I choose stretches for the muscles used and improve my range."],
+        ["I do not know my own scores.", "I complete a fitness test with help.", "I record the test scores and set one target.", "I use the results to plan the next block of training."],
+        ["I distract others.", "I count for a partner.", "I count, time and encourage a partner accurately.", "I lead a station, correct technique and adapt it to my partner."]],
+  y911: [["I work continuously for a short time.", "I sustain the effort for the whole set time.", "I sustain the effort and improve the score.", "I train in a target heart-rate zone and improve a measured test result."],
+         ["I complete the reps with support or half range.", "I complete all the reps with correct form.", "I increase reps or load while keeping the form.", "I train at a set intensity and progress safely across a block."],
+         ["I copy the stretches.", "I hold each stretch for the full time.", "I choose stretches for the muscles used.", "I use dynamic and static work at the right point in the session and explain why."],
+         ["I complete a fitness test with help.", "I record the scores and set a target.", "I use the results to plan the next block.", "I design a personal programme from the training principles and evaluate it."],
+         ["I count for a partner.", "I count, time and encourage accurately.", "I lead a station and correct technique.", "I lead a full circuit for a group: timing, technique, safety and adaptation."]]},
 "Netball": {
-  skills: [["motor", "Passing", "Delivers the ball under pressure"], ["motor", "Footwork and movement", "Moves legally into space"], ["motor", "Shooting or defending", "Performs my position\\u2019s job"], ["method", "Positions and rules", "Plays the position properly"], ["social", "Umpiring and team roles", "Takes a role for the group"]],
-  y78: [["Passes without looking and loses the ball.", "Chest pass to a player standing still.", "Accurate chest and shoulder pass to a moving player.", "Chooses and disguises the pass under pressure."],
-        ["Steps or runs with the ball.", "Stops on two feet and keeps the landing foot.", "Correct footwork with a dodge and a lead into space.", "Quick change of direction and pivots to open the court."],
-        ["Avoids the role.", "Attempts a shot or marks near the player.", "Shoots with a set routine, or marks at 0.9m and blocks.", "Scores under pressure, or intercepts and rebounds."],
-        ["Does not know their area.", "Stays in their third with reminders.", "Plays the position correctly and knows offside and contact.", "Adapts to a new position and explains its role."],
-        ["Takes no role.", "Keeps the score.", "Umpires a game: footwork, contact, obstruction.", "Umpires confidently and captains a team fairly."]],
-  y911: [["Chest pass to a player standing still.", "Accurate chest and shoulder pass to a moving player.", "Chooses and disguises the pass under pressure.", "Delivers accurately into the circle under a defender at speed."],
-         ["Stops on two feet and keeps the landing foot.", "Correct footwork with a dodge and a lead.", "Quick change of direction and pivots to open the court.", "Uses timing and re-offers to keep the attack moving."],
-         ["Attempts a shot or marks near the player.", "Shoots with a set routine, or marks at 0.9m.", "Scores under pressure, or intercepts and rebounds.", "Performs the role consistently in a full game and adapts to the opponent."],
-         ["Stays in their third with reminders.", "Plays the position correctly and knows offside and contact.", "Adapts to a new position and explains its role.", "Understands the whole court structure and adjusts the team's set-up."],
-         ["Keeps the score.", "Umpires a game.", "Umpires confidently and captains fairly.", "Umpires a full match with signals and manages both teams."]]}
+  skills: [["motor", "Passing", "I deliver the ball under pressure"], ["motor", "Footwork and movement", "I move legally into space"], ["motor", "Shooting or defending", "I perform my position\\u2019s job"], ["method", "Positions and rules", "I play the position properly"], ["social", "Umpiring and team roles", "I take a role for the group"]],
+  y78: [["I pass without looking and lose the ball.", "I chest pass to a player standing still.", "I make an accurate chest and shoulder pass to a moving player.", "I choose and disguise the pass under pressure."],
+        ["I step or run with the ball.", "I stop on two feet and keep the landing foot.", "I use correct footwork with a dodge and a lead into space.", "I change direction quickly and pivot to open the court."],
+        ["I avoid the role.", "I attempt a shot or mark near the player.", "I shoot with a set routine, or mark at 0.9m and block.", "I score under pressure, or intercept and rebound."],
+        ["I do not know my area.", "I stay in my third with reminders.", "I play the position correctly and know offside and contact.", "I adapt to a new position and explain its role."],
+        ["I take no role.", "I keep the score.", "I umpire a game: footwork, contact, obstruction.", "I umpire confidently and captain a team fairly."]],
+  y911: [["I chest pass to a player standing still.", "I make an accurate chest and shoulder pass to a moving player.", "I choose and disguise the pass under pressure.", "I deliver accurately into the circle under a defender at speed."],
+         ["I stop on two feet and keep the landing foot.", "I use correct footwork with a dodge and a lead.", "I change direction quickly and pivot to open the court.", "I use timing and re-offers to keep the attack moving."],
+         ["I attempt a shot or mark near the player.", "I shoot with a set routine, or mark at 0.9m.", "I score under pressure, or intercept and rebound.", "I perform the role consistently in a full game and adapt to the opponent."],
+         ["I stay in my third with reminders.", "I play the position correctly and know offside and contact.", "I adapt to a new position and explain its role.", "I understand the whole court structure and adjust the team's set-up."],
+         ["I keep the score.", "I umpire a game.", "I umpire confidently and captain fairly.", "I umpire a full match with signals and manage both teams."]]},
+"Football": {
+  skills: [["motor", "Passing & Receiving", ""], ["motor", "Dribbling & Control", ""], ["motor", "Shooting", ""], ["method", "Warm-Up Leader", ""], ["social", "Refereeing", ""]],
+  notes: ["Use the inside of your foot for the most accurate passes. Before you get the ball, look around to see where your teammates are. A great first touch doesn't just stop the ball — it pushes it slightly in the direction you want to go next, keeping it away from defenders so you are ready to play quickly.",
+          "Keep the ball close to your feet using quick, small touches. The secret to great dribbling is keeping your head up so you can see open space. To beat a defender, use a sudden change of pace: slow down to trick them, then burst past them into the open field.",
+          "Aiming well is better than just kicking hard. For power, point your toes down and strike the middle of the ball with your laces. Place your plant foot right next to the ball, pointing at your target. Lean slightly forward and follow through with your kicking leg to keep the ball low.",
+          "A good football warm-up gets the heart pumping and muscles ready. Start with jogging, then move into dynamic stretches like high knees or side-steps. Finish with short, game-realistic drills like passing in a circle or short sprints with the ball. Speak loudly and clearly.",
+          "A good referee is confident, fair, and loud. When you see a foul or a handball, blow the whistle immediately so everyone stops. Use clear arm signals to show whose ball it is for throw-ins and corners. Sometimes letting the game play on is better if the team that was fouled still has an advantage."],
+  all: [["I often lose the ball. My passes miss and my first touch is heavy.", "I can pass and stop the ball well when no one is pressuring me.", "I make accurate passes and control the ball cleanly, even under pressure.", "I pass perfectly with both feet. My first touch always sets up my next move."],
+        ["I look at my feet too much and lose the ball when trying to run.", "I can dribble at a jog, but I struggle to beat defenders.", "I keep the ball close at speed and use turns to beat defenders.", "I dribble fast with my head up, scanning the field and beating defenders easily."],
+        ["My shots are weak and usually miss the target.", "I hit the target, but my shots lack power or good placement.", "I shoot with good power and aim for the corners during games.", "I strike perfectly (laces or inside). I score under pressure with power and precision."],
+        ["I don't know what exercises to lead, or they don't fit the session.", "I lead a basic warm-up, but my instructions to the team are unclear.", "I clearly explain and run warm-up drills for passing, dribbling, and shooting.", "I run highly engaging, perfectly organised drills that get everyone match-ready."],
+        ["I don't know the rules well and stay quiet during the game.", "I know the rules but hesitate to blow the whistle or speak up.", "I make fair calls, blow the whistle loudly, and stay focused on the game.", "I referee with confidence, use clear signals, and easily manage the game fairly."]]}
 };
 
 async function installLibrary(){
-  const bands = [[78,'y78'], [911,'y911']];
-  for (const sport in LIB) for (const [yg] of bands)
+  const bandsOf = sp => LIB[sp].all ? [[0,'all']] : [[78,'y78'], [911,'y911']];
+  for (const sport in LIB) for (const [yg] of bandsOf(sport))
     await DB.upsert(T.grids, [{ sport, year_group: yg, title: `${sport} \u2014 ${yearLabel(yg)}` }], ['sport','year_group']);
   S.grids = await DB.select(T.grids);
-  for (const sport in LIB) for (const [yg, key] of bands){
+  for (const sport in LIB) for (const [yg, key] of bandsOf(sport)){
     const g = S.grids.find(x => x.sport === sport && +x.year_group === yg);
     const have = S.skills.filter(k => String(k.grid_id) === String(g.id));
     await DB.upsert(T.skills, LIB[sport].skills.map((sk, i) => {
       const ex = have.find(k => k.idx === i+1), d = LIB[sport][key][i];
-      return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx: i+1, type: sk[0], name: sk[1], criteria: sk[2], d1:d[0], d2:d[1], d3:d[2], d4:d[3] };
+      return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx: i+1, type: sk[0], name: sk[1], criteria: sk[2],
+               notes: (LIB[sport].notes || [])[i] || '', d1:d[0], d2:d[1], d3:d[2], d4:d[3] };
     }), ['grid_id','idx']);
   }
   S.grids = await DB.select(T.grids); S.skills = await DB.select(T.skills);
@@ -821,13 +861,17 @@ function seedDemo(force){
 
   const grids = [], sk = [];
   let gid = 300, kid = 400;
-  for (const sport in LIB) for (const [yg, key] of [[78,'y78'], [911,'y911']]){
-    const id = gid++;
-    grids.push({ id, sport, year_group: yg, title: `${sport} \u2014 ${yg === 78 ? 'Years 7\u20138' : 'Years 9\u201311'}` });
-    LIB[sport].skills.forEach((skill, i) => {
-      const d = LIB[sport][key][i];
-      sk.push({ id: kid++, grid_id: id, idx: i+1, type: skill[0], name: skill[1], criteria: skill[2], d1:d[0], d2:d[1], d3:d[2], d4:d[3] });
-    });
+  for (const sport in LIB){
+    const bands = LIB[sport].all ? [[0,'all']] : [[78,'y78'], [911,'y911']];
+    for (const [yg, key] of bands){
+      const id = gid++;
+      grids.push({ id, sport, year_group: yg, title: `${sport} \u2014 ${yg === 78 ? 'Years 7\u20138' : yg === 911 ? 'Years 9\u201311' : 'all years'}` });
+      LIB[sport].skills.forEach((skill, i) => {
+        const d = LIB[sport][key][i];
+        sk.push({ id: kid++, grid_id: id, idx: i+1, type: skill[0], name: skill[1], criteria: skill[2],
+                  notes: (LIB[sport].notes || [])[i] || '', d1:d[0], d2:d[1], d3:d[2], d4:d[3] });
+      });
+    }
   }
   const bball = grids.find(g => g.sport === 'Basketball' && g.year_group === 78).id;
 
@@ -877,7 +921,8 @@ async function loadAwards(gid, ids){
   const rows = await DB.select(T.awards, { grid_id: gid, student_id: ids });
   S.awards = S.awards.filter(a => !(String(a.grid_id) === String(gid) && ids.includes(a.student_id))).concat(rows);
 }
-const phaseDone = (sid, gid, phase) => S.marks.filter(m => m.student_id === sid && m.grid_id === gid && m.phase === phase && m.level).length === 5;
+const nSkills = gid => S.skills.filter(k => String(k.grid_id) === String(gid)).length;
+const phaseDone = (sid, gid, phase) => { const n = nSkills(gid); return n > 0 && S.marks.filter(m => m.student_id === sid && String(m.grid_id) === String(gid) && m.phase === phase && m.level).length === n; };
 
 /* ============================================================
    LOGIN
@@ -1037,7 +1082,7 @@ function renderLadders(){
   sk.forEach(k => { const m = markOf(S.user.id, g.id, S.phase, k.idx); if (m) S.draft[k.idx] = m.level; });
 
   msg('#phaseMsg',
-    open ? (saved ? 'Saved. You can still change it.' : 'Tap the description that sounds most like you. It saves on its own.')
+    open ? (saved ? 'Saved. You can still change it.' : `Tap the description that sounds most like you, for each of the ${sk.length} skills. It saves on its own.`)
          : (saved ? 'Saved. T1, T2 and T3 are your teacher\'s marks.' : 'Your teacher has not opened this yet.'),
     open && saved ? 'ok' : 'info');
 
@@ -1048,7 +1093,7 @@ function renderLadders(){
         ${[1,2,3,4].map(l => {
           const t = saved ? ['t1','t2','t3'].filter(p => (markOf(S.user.id, g.id, p, k.idx)||{}).level === l).map(p => p.toUpperCase()).join(' ') : '';
           return `<button class="rung lv${l}" data-l="${l}" aria-pressed="${S.draft[k.idx] === l}" ${open ? '' : 'disabled'}>
-            <span class="lvl">${l}</span><span class="txt">${esc(k['d'+l] || '')}</span>
+            <span class="lvl">${l} · ${LEVEL_NAME[l]}</span><span class="txt">${esc(k['d'+l] || '')}</span>
             ${t ? `<span class="tmark">${t}</span>` : ''}</button>`;
         }).join('')}
       </div></div>`).join('');
@@ -1060,14 +1105,18 @@ function renderLadders(){
     updateProgress();
     saveOne(idx, +b.dataset.l);
   });
+  const notes = sk.filter(k => (k.notes||'').trim());
+  $('#notes').innerHTML = !notes.length ? '' :
+    `<h2 class="noteshead">Technical expectations &amp; deep understanding</h2>`
+    + notes.map(k => `<div class="note"><h3>${k.idx}. ${esc(k.name)}</h3><p>${esc(k.notes)}</p></div>`).join('');
   $('#saveBar').classList.toggle('hide', !open);
   updateProgress();
   window.scrollTo(0,0);
 }
 function updateProgress(){
-  const n = Object.keys(S.draft).length;
-  $('#progFill').style.width = (n/5*100) + '%';
-  $('#progText').textContent = `${n} / 5`;
+  const n = Object.keys(S.draft).length, total = skillsOf(S.grid.id).length || 1;
+  $('#progFill').style.width = (n/total*100) + '%';
+  $('#progText').textContent = `${n} / ${total}`;
 }
 $('#btnBackHome').onclick = () => renderStudentHome();
 $('#btnPrintSelf').onclick = () => window.print();
@@ -1077,8 +1126,8 @@ async function saveOne(idx, level){
   try {
     await DB.upsert(T.marks, [{ ...(ex ? { id: ex.id } : {}), student_id: S.user.id, grid_id: g.id, phase: S.phase, skill_idx: idx, level }], ['student_id','grid_id','phase','skill_idx']);
     S.marks = await DB.select(T.marks, { student_id: S.user.id });
-    const all = Object.keys(S.draft).length === 5;
-    $('#saveState').textContent = all ? 'All 5 saved' : 'Saved';
+    const all = Object.keys(S.draft).length === skillsOf(g.id).length;
+    $('#saveState').textContent = all ? 'All saved' : 'Saved';
     if (all) msg('#phaseMsg', 'All done. Your teacher can see it now.', 'ok');
   } catch (e){ $('#saveState').textContent = 'Not saved — try again'; }
 }
@@ -1329,14 +1378,14 @@ function renderGridEditor(){
         <label class="field"><span>Applies to</span><select id="ngYear"><option value="78">Years 7&ndash;8</option><option value="911">Years 9&ndash;11</option><option value="0">All year groups</option><option value="7">Year 7 only</option><option value="8">Year 8 only</option><option value="9">Year 9 only</option><option value="10">Year 10 only</option><option value="11">Year 11 only</option></select></label>
         <button class="btn primary sm" id="btnNewGrid">Create grid</button>
       </div>
-      <p class="muted small">Creates five empty skills: three motor, one methodological, one social. Fill them in below, or import a CSV.</p></div>`;
+      <p class="muted small">Creates five empty skills: three motor, one methodological, one social. Add or remove skills afterwards, or import a CSV.</p></div>`;
     $('#btnNewGrid').onclick = async () => {
       const sport = $('#ngSport').value.trim(), year = +$('#ngYear').value;
       if (!sport) return;
       await DB.upsert(T.grids, [{ sport, year_group: year, title: `${sport} — ${yearLabel(year)}` }], ['sport','year_group']);
       S.grids = await DB.select(T.grids);
       const gr = S.grids.find(g => g.sport === sport && +g.year_group === year);
-      await DB.upsert(T.skills, [1,2,3,4,5].map(i => ({ grid_id: gr.id, idx: i, type: i <= 3 ? 'motor' : i === 4 ? 'method' : 'social', name: '', criteria: '', d1:'', d2:'', d3:'', d4:'' })), ['grid_id','idx']);
+      await DB.upsert(T.skills, [1,2,3,4,5].map(i => ({ grid_id: gr.id, idx: i, type: i <= 3 ? 'motor' : i === 4 ? 'method' : 'social', name: '', criteria: '', notes: '', d1:'', d2:'', d3:'', d4:'' })), ['grid_id','idx']);
       S.skills = await DB.select(T.skills);
       fillGridSelect(); $('#gSelect').value = gr.id; renderGridEditor();
     };
@@ -1345,25 +1394,45 @@ function renderGridEditor(){
   const g = S.grids.find(x => String(x.id) === String(v)); if (!g) return;
   const sk = skillsOf(g.id);
   $('#gPrintTitle').textContent = g.title || `${g.sport} — ${yearLabel(g.year_group)}`;
-  $('#gridEditor').innerHTML = sk.map(s => `<div class="skill" data-idx="${s.idx}">
+  $('#gridEditor').innerHTML = sk.map(s0 => `<div class="skill" data-idx="${s0.idx}">
     <div class="skill-head">
-      <span class="skill-num">${s.idx}</span>
-      <span class="skill-type ${s.type === 'social' ? 'social' : s.type === 'method' ? 'method' : ''}">${s.type === 'method' ? 'Method' : s.type === 'social' ? 'Social' : 'Motor'}</span>
+      <span class="skill-num">${s0.idx}</span>
+      <span class="skill-type ${s0.type === 'social' ? 'social' : s0.type === 'method' ? 'method' : ''}">${s0.type === 'method' ? 'Method' : s0.type === 'social' ? 'Social' : 'Motor'}</span>
       <span style="flex:1">
-        <input class="gname" value="${esc(s.name)}" placeholder="Skill name" style="width:100%; border:0; font-weight:700; font-family:var(--display); font-size:1rem; background:transparent">
-        <input class="gcrit" value="${esc(s.criteria||'')}" placeholder="Criteria" style="width:100%; border:0; color:var(--muted); font-size:.85rem; background:transparent">
+        <input class="gname" value="${esc(s0.name)}" placeholder="Skill name" style="width:100%; border:0; font-weight:700; font-family:var(--display); font-size:1rem; background:transparent">
+        <input class="gcrit" value="${esc(s0.criteria||'')}" placeholder="Criteria" style="width:100%; border:0; color:var(--muted); font-size:.85rem; background:transparent">
       </span>
     </div>
     <div class="rungs">${[1,2,3,4].map(l => `<div class="rung lv${l}" style="cursor:text">
-      <span class="lvl">${l}</span>
-      <textarea class="gd" data-l="${l}" rows="4" style="width:100%; border:0; background:transparent; font:inherit; font-size:.88rem; resize:vertical" placeholder="Level ${l} description">${esc(s['d'+l]||'')}</textarea>
-    </div>`).join('')}</div></div>`).join('')
-    + `<div class="btnrow noprint" style="margin-bottom:20px"><button class="btn primary" id="btnSaveGrid">Save grid</button><span id="gridSaveMsg" class="small muted" style="align-self:center"></span></div>`;
+      <span class="lvl">${l} · ${LEVEL_NAME[l]}</span>
+      <textarea class="gd" data-l="${l}" rows="4" style="width:100%; border:0; background:transparent; font:inherit; font-size:.88rem; resize:vertical" placeholder="Level ${l} description">${esc(s0['d'+l]||'')}</textarea>
+    </div>`).join('')}</div>
+    <div style="padding:10px 14px; border-top:1px solid var(--line)">
+      <span class="eyebrow">Technical expectations — printed on the back</span>
+      <textarea class="gnotes" rows="3" style="width:100%; border:0; background:transparent; font:inherit; font-size:.86rem; resize:vertical" placeholder="How to actually do this well. Shown to students under the grid and printed on page 2.">${esc(s0.notes||'')}</textarea>
+    </div></div>`).join('')
+    + `<div class="btnrow noprint" style="margin-bottom:20px"><button class="btn primary" id="btnSaveGrid">Save grid</button>
+       <button class="btn" id="btnAddSkill">Add a skill</button>
+       <button class="btn danger" id="btnDelSkill">Remove last skill</button>
+       <span id="gridSaveMsg" class="small muted" style="align-self:center"></span></div>`;
+  $('#btnAddSkill').onclick = async () => {
+    await DB.upsert(T.skills, [{ grid_id: g.id, idx: sk.length + 1, type: 'motor', name: '', criteria: '', notes: '', d1:'', d2:'', d3:'', d4:'' }], ['grid_id','idx']);
+    S.skills = await DB.select(T.skills); renderGridEditor();
+  };
+  $('#btnDelSkill').onclick = async () => {
+    const last = sk[sk.length-1]; if (!last || sk.length <= 3) return alert('A grid needs at least 3 skills.');
+    if (!confirm(`Remove skill ${last.idx}${last.name ? ' — ' + last.name : ''} and every mark against it?`)) return;
+    await DB.remove(T.skills, { id: last.id });
+    await DB.remove(T.marks, { grid_id: g.id, skill_idx: last.idx });
+    S.skills = await DB.select(T.skills); renderGridEditor();
+  };
   $('#btnSaveGrid').onclick = async () => {
     const rows = Array.from(document.querySelectorAll('#gridEditor .skill')).map(box => {
       const idx = +box.dataset.idx, ex = sk.find(x => x.idx === idx);
       const d = {}; box.querySelectorAll('.gd').forEach(t => d['d'+t.dataset.l] = t.value.trim());
-      return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx, type: ex.type, name: box.querySelector('.gname').value.trim(), criteria: box.querySelector('.gcrit').value.trim(), ...d };
+      return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx, type: ex ? ex.type : 'motor',
+               name: box.querySelector('.gname').value.trim(), criteria: box.querySelector('.gcrit').value.trim(),
+               notes: box.querySelector('.gnotes').value.trim(), ...d };
     });
     await DB.upsert(T.skills, rows, ['grid_id','idx']);
     S.skills = await DB.select(T.skills);
@@ -1375,6 +1444,139 @@ $('#btnInstallLib').onclick = async () => {
   await installLibrary(); fillGridSelect(); renderGridEditor();
   alert('Standard sports loaded.');
 };
+// Parser logic — identical to what goes into the app.
+function linesOf(items, tol = 3){
+  const sorted = items.slice().sort((a,b) => a.y - b.y || a.x - b.x);
+  const lines = [];
+  for (const it of sorted){
+    const last = lines[lines.length-1];
+    if (last && Math.abs(last.y - it.y) <= tol){ last.items.push(it); last.y = (last.y + it.y)/2; }
+    else lines.push({ y: it.y, items: [it] });
+  }
+  lines.forEach(l => l.items.sort((a,b) => a.x - b.x));
+  return lines;
+}
+const clean = t => t.replace(/(\w)-\s+(\w)/g, '$1-$2').replace(/\s+/g, ' ').replace(/\s+([.,;:!?])/g, '$1').trim();
+
+function parseGridPage(page){
+  const lines = linesOf(page.items);
+  let hdr = null;
+  for (const l of lines){
+    const lv = l.items.filter(i => /^Level\b/i.test(i.str.trim()));
+    if (lv.length >= 3){ hdr = { line: l, xs: lv.map(i => i.x).sort((a,b) => a-b) }; break; }
+    const joined = l.items.map(i => i.str).join(' ');
+    if (/Level\s*1/i.test(joined) && /Level\s*4/i.test(joined)){
+      const xs = l.items.filter(i => /Level/i.test(i.str)).map(i => i.x).sort((a,b)=>a-b);
+      if (xs.length >= 3){ hdr = { line: l, xs }; break; }
+    }
+  }
+  if (!hdr) throw new Error('No "Level 1 … Level 4" header row found on page 1.');
+  const bounds = [Math.min(...hdr.line.items.map(i => i.x)), ...hdr.xs].slice(0, 5);
+  const colOf = x => { let c = 0; bounds.forEach((b,i) => { if (x >= b - 8) c = i; }); return c; };
+
+  const skills = [];
+  let cur = null;
+  for (const l of lines){
+    if (l.y <= hdr.line.y + 4) continue;
+    const cells = ['','','','',''];
+    for (const it of l.items){ const c = colOf(it.x); cells[c] = (cells[c] + ' ' + it.str).trim(); }
+    const head = cells[0].match(/^(\d+)\s*[.)]\s*(.+)$/);
+    if (head){
+      cur = { idx: +head[1], name: clean(head[2]), criteria: '', type: 'motor', d: ['','','',''] };
+      skills.push(cur);
+    } else if (cur && cells[0]){
+      const up = cells[0].trim();
+      if (up === up.toUpperCase() && /[A-Z]/.test(up)){
+        if (/METHOD/i.test(up)) cur.type = 'method';
+        else if (/SOCIAL/i.test(up)) cur.type = 'social';
+        else cur.type = 'motor';
+        const par = up.match(/\(([^)]+)\)/);
+        if (par) cur.criteria = par[1].charAt(0) + par[1].slice(1).toLowerCase();
+      } else if (!cur.criteria) cur.criteria = clean(up);
+    }
+    if (cur) for (let c = 1; c <= 4; c++) if (cells[c]) cur.d[c-1] = (cur.d[c-1] + ' ' + cells[c]).trim();
+  }
+  skills.forEach(s => s.d = s.d.map(clean));
+  return skills.filter(s => s.name && s.d.some(x => x));
+}
+
+function parseNotesPage(page){
+  const mid = page.width / 2;
+  const notes = {};
+  for (const side of [0,1]){
+    const items = page.items.filter(i => (i.x < mid ? 0 : 1) === side);
+    let cur = null;
+    for (const l of linesOf(items)){
+      const txt = clean(l.items.map(i => i.str).join(' '));
+      if (!txt) continue;
+      const h = txt.match(/^(\d+)\s*[.)]\s*(.{2,60})$/);
+      if (h && !/[.!?]$/.test(txt)){ cur = +h[1]; notes[cur] = ''; }
+      else if (cur) notes[cur] = clean((notes[cur] + ' ' + txt));
+    }
+  }
+  return notes;
+}
+
+function sportFromTitle(page){
+  const first = linesOf(page.items)[0];
+  if (!first) return '';
+  let t = clean(first.items.map(i => i.str).join(' '));
+  t = t.replace(/self[- ]assessment.*$/i, '').replace(/\(.*?\)/g, '').replace(/[\d\s]+SKILLS?/i, '').trim();
+  if (!t) return '';
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+async function pdfPages(file){
+  const lib = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs');
+  lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+  const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const out = [];
+  for (let n = 1; n <= pdf.numPages; n++){
+    const p = await pdf.getPage(n), vp = p.getViewport({ scale: 1 }), tc = await p.getTextContent();
+    out.push({ width: vp.width, items: tc.items.filter(i => i.str.trim())
+      .map(i => ({ str: i.str, x: i.transform[4], y: vp.height - i.transform[5] })) });
+  }
+  return out;
+}
+$('#filePdf').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  msg('#pdfMsg', 'Reading the PDF…', 'info');
+  try {
+    const pg = await pdfPages(f);
+    const sport = sportFromTitle(pg[0]);
+    if (sport && !$('#pdfSport').value.trim()) $('#pdfSport').value = sport;
+    const n = parseGridPage(pg[0]).length;
+    msg('#pdfMsg', `Found ${n} skills${pg[1] ? ' and a technical expectations page' : ''}. Check the sport name, then Import.`, 'ok');
+  } catch (err){ msg('#pdfMsg', err.message, 'err'); }
+};
+$('#btnImportPdf').onclick = async () => {
+  const f = $('#filePdf').files[0];
+  if (!f) return msg('#pdfMsg', 'Choose a PDF first.', 'err');
+  try {
+    msg('#pdfMsg', 'Importing…', 'info');
+    const pg = await pdfPages(f);
+    const skills = parseGridPage(pg[0]);
+    if (!skills.length) throw new Error('No skills found. Page 1 needs a table with a Skill column and Level 1 to Level 4.');
+    const notes = pg[1] ? parseNotesPage(pg[1]) : {};
+    const sport = ($('#pdfSport').value.trim() || sportFromTitle(pg[0]));
+    if (!sport) throw new Error('Type the sport name — it could not be read from the PDF.');
+    const yg = +$('#pdfBand').value;
+    await DB.upsert(T.grids, [{ sport, year_group: yg, title: `${sport} \u2014 ${yearLabel(yg)}` }], ['sport','year_group']);
+    S.grids = await DB.select(T.grids);
+    const g = S.grids.find(x => x.sport === sport && +x.year_group === yg);
+    const have = S.skills.filter(k => String(k.grid_id) === String(g.id));
+    await DB.upsert(T.skills, skills.map((sk, i) => {
+      const ex = have.find(k => k.idx === i+1);
+      return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx: i+1, type: sk.type, name: sk.name,
+               criteria: sk.criteria || '', notes: notes[sk.idx] || '', d1: sk.d[0], d2: sk.d[1], d3: sk.d[2], d4: sk.d[3] };
+    }), ['grid_id','idx']);
+    for (const extra of have.filter(k => k.idx > skills.length)) await DB.remove(T.skills, { id: extra.id });
+    S.skills = await DB.select(T.skills);
+    fillGridSelect(); $('#gSelect').value = g.id; renderGridEditor();
+    msg('#pdfMsg', `${sport}: ${skills.length} skills imported. Check the wording below, then Save grid.`, 'ok');
+  } catch (err){ msg('#pdfMsg', err.message, 'err'); }
+};
+
 $('#btnPrintGrid').onclick = () => window.print();
 $('#btnDeleteGrid').onclick = async () => {
   const g = S.grids.find(x => String(x.id) === $('#gSelect').value); if (!g) return;
@@ -1542,7 +1744,8 @@ $('#btnImportGrid').onclick = async () => {
       const rows = byGrid[k].map(o => {
         const idx = +(o.skill_index || o.idx), ex = existing.find(x => x.idx === idx);
         return { ...(ex ? { id: ex.id } : {}), grid_id: g.id, idx, type: (o.type||'motor').toLowerCase(),
-          name: o.skill_name || o.name, criteria: o.criteria || '', d1: o.level1, d2: o.level2, d3: o.level3, d4: o.level4 };
+          name: o.skill_name || o.name, criteria: o.criteria || '', notes: o.notes || '',
+          d1: o.level1, d2: o.level2, d3: o.level3, d4: o.level4 };
       }).filter(r => r.idx);
       await DB.upsert(T.skills, rows, ['grid_id','idx']);
     }
@@ -1552,7 +1755,7 @@ $('#btnImportGrid').onclick = async () => {
   } catch (e){ msg('#gridMsg', e.message, 'err'); }
 };
 $('#btnTplGrid').onclick = () => downloadCSV('grid_template.csv', [
-  ['sport','year_group','skill_index','type','skill_name','criteria','level1','level2','level3','level4'],
+  ['sport','year_group','skill_index','type','skill_name','criteria','level1','level2','level3','level4','notes'],
   ['Gymnastics','7','1','motor','Balance','Holds a shape still','Wobbles and steps off','Holds 2 seconds','Holds 4 seconds with a clear shape','Holds 4 seconds on a small base with control'],
   ['Gymnastics','7','2','motor','','','','','',''],
   ['Gymnastics','7','3','motor','','','','','',''],
