@@ -452,6 +452,18 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
       </div>
       <p class="tiny muted">A sport set for one class replaces the year group's sport for that term, so classes can rotate.</p>
       <div class="tablewrap" id="progTable"></div>
+    </div>
+
+    <div class="card pad" style="margin-top:14px">
+      <h3>Student access</h3>
+      <p class="muted small">Nothing is editable by students until you switch it on here. Switch it off again to lock their answers.</p>
+      <div class="toolbar" style="margin-top:12px">
+        <label class="field"><span>Sport</span><select id="acSport"></select></label>
+        <button class="btn sm" id="btnAllT1">Test 1: all on</button>
+        <button class="btn sm" id="btnAllFinal">Final test: all on</button>
+        <button class="btn sm danger" id="btnAllOff">Lock everything</button>
+      </div>
+      <div class="tablewrap" id="accessTable"></div>
       <details class="help">
         <summary>Import programme from CSV</summary>
         <pre>year_group,class_name,sport,term   (leave class_name empty for the whole year)</pre>
@@ -573,7 +585,7 @@ const store = {
   set: (k, v) => { try { LS_OK ? localStorage.setItem(k, v) : (MEM[k] = v); } catch { MEM[k] = v; } }
 };
 const LEVEL_NAME = ['', 'Needs work', 'Developing', 'Proficient', 'Advanced'];
-const T = { settings:'aa_settings', students:'aa_students', classes:'aa_classes', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', marks:'aa_marks', awards:'aa_awards' };
+const T = { settings:'aa_settings', students:'aa_students', classes:'aa_classes', access:'aa_access', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', marks:'aa_marks', awards:'aa_awards' };
 
 /* ============================================================
    DATA LAYER — same API for Supabase and for demo mode
@@ -648,7 +660,7 @@ const DB = {
 /* ---------- app state ---------- */
 const S = {
   settings: null, user: null, role: null,
-  students: [], classes: [], roster: [], programme: [], grids: [], skills: [], marks: [], awards: [],
+  students: [], classes: [], access: [], roster: [], programme: [], grids: [], skills: [], marks: [], awards: [],
   sport: null, grid: null, phase: 'self1', draft: {}
 };
 const STUDENT_COLS = 'id,code,full_name,class_name,year_group,house,wd_carry';
@@ -898,7 +910,7 @@ function seedDemo(force){
     [9,'Rugby','Term 1'], [9,'Netball','Term 1'], [9,'Ultimate frisbee','Term 2'], [9,'Fitness','Term 2'], [9,'Athletics','Term 3'], [9,'Pickleball','Term 3'],
     [10,'Fitness','Term 1'], [10,'Gym','Term 1'], [10,'Volleyball','Term 2'], [10,'Swimming speed','Term 2'], [10,'Badminton','Term 3'], [10,'Pickleball','Term 3'],
     [11,'Gym','Term 1'], [11,'Fitness','Term 1'], [11,'Basketball','Term 2'], [11,'Swimming endurance','Term 2'], [11,'Handball','Term 3'], [11,'Dance','Term 3']
-  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, class_name:'', sport, term, final_open:false, sort:i }));
+  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, class_name:'', sport, term, sort:i }));
 
   const grids = [], sk = [];
   let gid = 300, kid = 400;
@@ -925,6 +937,7 @@ function seedDemo(force){
 
   const classes = [['7A',7],['8A',8],['8B',8]].map(([class_name, year_group]) => ({ class_name, year_group, join_code: class_name + '-PE' }));
   DB._save(T.classes, classes);
+  DB._save(T.access, [{ id:900, class_name:'8A', sport:'Basketball', test1_open:true, final_open:false }]);
   DB._save(T.students, students); DB._save(T.programme, programme); DB._save(T.grids, grids);
   DB._save(T.skills, sk); DB._save(T.marks, marks); DB._save(T.awards, []);
   DB._save(T.settings, [{ id:1, data: DEFAULT_SETTINGS }]);
@@ -936,16 +949,16 @@ function seedDemo(force){
    ============================================================ */
 async function loadCore(){
   const canList = DB.mode === 'demo' || S.role === 'teacher';
-  const [settings, students, classes, programme, grids, skills, awards] = await Promise.all([
+  const [settings, students, classes, access, programme, grids, skills, awards] = await Promise.all([
     DB.select(T.settings),
     canList ? DB.select(T.students, null, '*') : Promise.resolve([]),
     DB.select(T.classes, null, DB.mode === 'demo' || S.role === 'teacher' ? '*' : 'class_name,year_group'),
-    DB.select(T.programme),
+    DB.select(T.access), DB.select(T.programme),
     DB.select(T.grids), DB.select(T.skills),
     (S.role === 'teacher' || !S.user) ? Promise.resolve([]) : DB.select(T.awards, { student_id: S.user.id })
   ]);
   S.settings = { ...DEFAULT_SETTINGS, ...((settings[0] && settings[0].data) || {}) };
-  S.students = students; S.classes = classes; S.programme = programme; S.grids = grids;
+  S.students = students; S.classes = classes; S.access = access; S.programme = programme; S.grids = grids;
   S.skills = skills; S.awards = awards;
 }
 const gridFor = (sport, year) => S.grids.find(g => g.sport === sport && +g.year_group === +year)
@@ -953,10 +966,11 @@ const gridFor = (sport, year) => S.grids.find(g => g.sport === sport && +g.year_
   || S.grids.find(g => g.sport === sport && +g.year_group === 0) || null;
 const skillsOf = gid => S.skills.filter(s => s.grid_id === gid).sort((a,b) => a.idx - b.idx);
 function progRow(cls, year, sport){ return progFor(cls, year).find(p => p.sport === sport) || null; }
+const accessOf = (cls, sport) => S.access.find(a => a.class_name === cls && a.sport === sport) || null;
 function selfOpen(cls, year, sport, phase){
-  const p = progRow(cls, year, sport);
-  if (!p || (p.term || '') !== (S.settings.currentTerm || '')) return false;
-  return phase === 'self1' ? true : !!p.final_open;
+  const a = accessOf(cls, sport);
+  if (!a) return false;
+  return phase === 'self1' ? !!a.test1_open : !!a.final_open;
 }
 const markOf = (sid, gid, phase, idx) => S.marks.find(m => m.student_id === sid && m.grid_id === gid && m.phase === phase && m.skill_idx === idx);
 async function loadMarks(gid, ids){
@@ -1175,8 +1189,8 @@ function renderStudentHome(){
   const card = p => {
     const g = gridFor(p.sport, S.user.year_group);
     const st = ph => !g ? ''
-      : phaseDone(S.user.id, g.id, ph) ? `<span class="chip done">&#10003; ${ph === 'self1' ? 'Lesson 1' : 'Final'}</span>`
-      : selfOpen(S.user.class_name, S.user.year_group, p.sport, ph) ? `<span class="chip open">Do it now</span>`
+      : phaseDone(S.user.id, g.id, ph) ? `<span class="chip done">&#10003; ${ph === 'self1' ? 'Test 1' : 'Final test'}</span>`
+      : selfOpen(S.user.class_name, S.user.year_group, p.sport, ph) ? `<span class="chip open">${ph === 'self1' ? 'Test 1 open' : 'Final test open'}</span>`
       : '';
     const chips = st('self1') + st('self2');
     return `<button class="sport" data-sport="${esc(p.sport)}" ${g ? '' : 'disabled'}>
@@ -1215,7 +1229,7 @@ function renderLadders(){
   const open = selfOpen(S.user.class_name, S.user.year_group, S.sport, S.phase);
   const saved = phaseDone(S.user.id, g.id, S.phase);
   $('#gridTitle').textContent = g.sport;
-  $('#phaseLine').textContent = S.phase === 'self1' ? 'Lesson 1' : 'Final lesson';
+  $('#phaseLine').textContent = S.phase === 'self1' ? 'Test 1 — lesson 1' : 'Final test — last lesson';
   $('#printTitle').textContent = g.title || g.sport;
   $('#printWho').textContent = `${S.user.full_name} · ${S.user.class_name}`;
 
@@ -1224,7 +1238,7 @@ function renderLadders(){
 
   msg('#phaseMsg',
     open ? (saved ? 'Saved. You can still change it.' : `Tap the description that sounds most like you, for each of the ${sk.length} skills. It saves on its own.`)
-         : (saved ? 'Saved. T1, T2 and T3 are your teacher\'s marks.' : 'This sport is not in the current term. Have a read \u2014 you can fill it in when you start it.'),
+         : (saved ? 'Saved and locked. T1, T2 and T3 are your teacher\'s marks.' : 'Your teacher has not opened this one yet. Have a read \u2014 you can fill it in when they do.'),
     open && saved ? 'ok' : 'info');
 
   $('#ladders').innerHTML = sk.map(k => `<div class="skill">
@@ -1249,7 +1263,7 @@ function renderLadders(){
   const both = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 'self2', k.idx)||{}).level }));
   const anyCompare = both.some(x => x.a) && both.some(x => x.b);
   $('#compare').innerHTML = !anyCompare ? '' : `<div class="card pad" style="margin-bottom:16px">
-      <span class="eyebrow">Lesson 1 &rarr; last lesson</span>
+      <span class="eyebrow">Test 1 &rarr; final test</span>
       ${both.map(x => `<div class="cmp"><span>${esc(x.k.name)}</span>
         <span><span class="lvlbadge lv${x.a||0}">${x.a||'·'}</span>
         <span class="arrow">${x.b > x.a ? '&uarr;' : x.b && x.b < x.a ? '&darr;' : '&rarr;'}</span>
@@ -1734,7 +1748,7 @@ function renderProgramme(){
     || String(a.class_name||'').localeCompare(String(b.class_name||''))
     || String(a.term||'').localeCompare(String(b.term||'')));
   $('#progTable').innerHTML = `<table><thead><tr><th>Applies to</th><th>Term</th><th>Sport</th><th>Grid</th>
-    <th>Students can</th><th class="noprint"></th></tr></thead><tbody>
+    <th class="noprint"></th></tr></thead><tbody>
     ${rows.map(p => {
       const live = (p.term||'') === now;
       return `<tr>
@@ -1742,9 +1756,6 @@ function renderProgramme(){
       <td class="tiny">${esc(p.term||'')} ${live ? '<span class="chip open">now</span>' : ''}</td>
       <td>${esc(p.sport)}</td>
       <td class="tiny">${gridFor(p.sport, p.year_group) ? esc(gridFor(p.sport, p.year_group).title) : '<span class="muted">no grid</span>'}</td>
-      <td class="tiny">${live
-        ? `<label class="inline"><input type="checkbox" data-fin="${p.id}" ${p.final_open ? 'checked' : ''}> also do the final one</label>`
-        : '<span class="muted">nothing (not this term)</span>'}</td>
       <td class="noprint"><button class="btn sm danger" data-del="${p.id}">Remove</button></td></tr>`;
     }).join('')}
     </tbody></table>`;
@@ -1752,12 +1763,52 @@ function renderProgramme(){
     await DB.remove(T.programme, { id: isNaN(+b.dataset.del) ? b.dataset.del : +b.dataset.del });
     S.programme = await DB.select(T.programme); renderProgramme(); fillClassSelects();
   });
-  $$('#progTable [data-fin]').forEach(c => c.onchange = async () => {
-    const id = isNaN(+c.dataset.fin) ? c.dataset.fin : +c.dataset.fin;
-    await DB.update(T.programme, { id }, { final_open: c.checked });
-    S.programme = await DB.select(T.programme);
-  });
+  renderAccess();
 }
+
+/* ---------- per-class ON/OFF ---------- */
+function classesDoing(sport){
+  return uniq(S.students.map(s => s.class_name)).filter(Boolean).sort()
+    .filter(c => progFor(c, (S.students.find(s => s.class_name === c)||{}).year_group).some(p => p.sport === sport));
+}
+function renderAccess(){
+  const now = S.settings.currentTerm || '';
+  const sports = uniq(S.programme.filter(p => (p.term||'') === now).map(p => p.sport)).sort();
+  const cur = $('#acSport').value;
+  $('#acSport').innerHTML = sports.map(sp => `<option>${esc(sp)}</option>`).join('') || '<option value="">nothing in this term</option>';
+  if (sports.includes(cur)) $('#acSport').value = cur;
+  const sport = $('#acSport').value;
+  const list = sport ? classesDoing(sport) : [];
+  $('#accessTable').innerHTML = !list.length ? '<p class="muted small">No class is doing this sport in the current term.</p>'
+    : `<table><thead><tr><th>Class</th><th class="num">Students</th><th>Test 1 (lesson 1)</th><th>Final test (last lesson)</th><th class="num">Done</th></tr></thead><tbody>
+      ${list.map(c => {
+        const a = accessOf(c, sport) || {};
+        const g = gridFor(sport, (S.students.find(s => s.class_name === c)||{}).year_group);
+        const kids = classStudents(c);
+        const done = ph => g ? kids.filter(k => phaseDone(k.id, g.id, ph)).length : 0;
+        return `<tr><td class="namecell">${esc(c)}</td><td class="num">${kids.length}</td>
+          <td><label class="switch"><input type="checkbox" data-ac="${esc(c)}" data-ph="test1_open" ${a.test1_open ? 'checked' : ''}><i></i></label></td>
+          <td><label class="switch"><input type="checkbox" data-ac="${esc(c)}" data-ph="final_open" ${a.final_open ? 'checked' : ''}><i></i></label></td>
+          <td class="num tiny">${done('self1')} / ${done('self2')}</td></tr>`;
+      }).join('')}</tbody></table>
+      <p class="tiny muted" style="margin:10px 0 0">Done = how many have saved Test 1 / the Final test.</p>`;
+  $$('#accessTable [data-ac]').forEach(c => c.onchange = () => setAccess(c.dataset.ac, sport, { [c.dataset.ph]: c.checked }));
+}
+async function setAccess(cls, sport, patch){
+  const a = accessOf(cls, sport);
+  await DB.upsert(T.access, [{ ...(a ? { id: a.id } : {}), class_name: cls, sport,
+    test1_open: a ? a.test1_open : false, final_open: a ? a.final_open : false, ...patch }], ['class_name','sport']);
+  S.access = await DB.select(T.access);
+}
+async function setAllAccess(patch){
+  const sport = $('#acSport').value; if (!sport) return;
+  for (const c of classesDoing(sport)) await setAccess(c, sport, patch);
+  renderAccess();
+}
+$('#acSport').onchange = renderAccess;
+$('#btnAllT1').onclick = () => setAllAccess({ test1_open: true });
+$('#btnAllFinal').onclick = () => setAllAccess({ final_open: true });
+$('#btnAllOff').onclick = () => setAllAccess({ test1_open: false, final_open: false });
 $('#setTerm').onchange = async () => {
   S.settings = { ...S.settings, currentTerm: $('#setTerm').value };
   await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
