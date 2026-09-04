@@ -77,6 +77,13 @@ a{color:var(--brand-2)}
 .small{font-size:.85rem}
 .tiny{font-size:.76rem}
 
+
+/* ---------- login pickers ---------- */
+.pickgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px}
+.pickgrid.tall{grid-template-columns:1fr; max-height:46vh; overflow-y:auto; gap:6px}
+.pick{padding:14px 10px; border:1px solid var(--line); background:#fff; border-radius:11px; font-weight:600; font-size:1rem; text-align:center; cursor:pointer}
+.pickgrid.tall .pick{text-align:left; font-size:.95rem; padding:12px 14px}
+.pick:hover{border-color:var(--brand-2); background:#F7F9FC}
 /* ---------- login ---------- */
 .auth{max-width:430px; margin:6vh auto; }
 .auth .card{padding:22px}
@@ -223,6 +230,13 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
 .note{margin-bottom:14px}
 .note h3{font-size:.95rem; margin-bottom:3px}
 .note p{margin:0; font-size:.9rem; color:#3D474F}
+.cmp{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:7px 0; border-bottom:1px solid var(--line); font-size:.9rem}
+.cmp:last-child{border-bottom:0}
+.cmp .arrow{display:inline-block; width:20px; text-align:center; color:var(--muted)}
+.lvlbadge{display:inline-block; font-family:var(--mono); font-weight:600; width:26px; height:26px; line-height:26px; text-align:center; border-radius:7px; background:#EDF0EC}
+.lvlbadge.lv1{background:var(--l1); color:var(--l1t)} .lvlbadge.lv2{background:var(--l2); color:var(--l2t)}
+.lvlbadge.lv3{background:var(--l3); color:#fff} .lvlbadge.lv4{background:var(--l4); color:#fff}
+label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 .termblock{margin-bottom:22px}
 .termhead{display:flex; align-items:center; gap:9px; margin:0 0 9px; padding-bottom:6px; border-bottom:1px solid var(--line)}
 .classbig{font-family:var(--display); font-weight:800; font-size:3rem; letter-spacing:-.03em; line-height:1}
@@ -261,42 +275,56 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
 <!-- ============ LOGIN ============ -->
 <section id="scr-login">
   <div class="auth">
-    <h1 style="margin-bottom:6px">Sign in</h1>
-    <p class="muted small" style="margin-top:0">Assess your skills, climb the levels, earn house points.</p>
+    <h1 id="loginH">Which class are you in?</h1>
+    <p class="muted small" id="loginSub" style="margin-top:4px">Three taps and you're in.</p>
     <div class="card pad">
-      <div class="tabs" role="tablist">
-        <button role="tab" id="tabStudent" aria-selected="true">Student</button>
-        <button role="tab" id="tabTeacher" aria-selected="false">Teacher</button>
+
+      <div id="step-class">
+        <div id="classGrid" class="pickgrid"></div>
+        <p class="tiny muted" style="margin-top:14px">Class missing? Ask your teacher to add it.</p>
       </div>
 
-      <form id="formStudent">
-        <label class="field"><span>Student ID</span><input id="sCode" autocomplete="username" placeholder="e.g. S8A01" required></label>
-        <label class="field"><span>PIN</span><input id="sPin" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="4 digits" required></label>
-        <button class="btn primary" style="width:100%; justify-content:center" type="submit">Sign in</button>
-      </form>
+      <div id="step-code" class="hide">
+        <p class="small muted" style="margin-top:0">Your teacher gives you this once. It keeps other classes out of your list.</p>
+        <label class="field"><span>Class code</span>
+          <input id="codeBox" maxlength="12" autocapitalize="characters" placeholder="e.g. 8A-4K2" style="font-family:var(--mono); font-size:1.2rem; text-align:center; letter-spacing:.15em"></label>
+        <button class="btn primary" id="btnCode" style="width:100%; justify-content:center">Continue</button>
+        <button class="btn ghost sm" id="backFromCode" style="margin-top:10px">&larr; Change class</button>
+      </div>
 
-      <form id="formTeacher" class="hide">
-        <label class="field"><span>Email</span><input id="tEmail" type="email" autocomplete="username" required></label>
-        <label class="field"><span>Password</span><input id="tPass" type="password" autocomplete="current-password" required></label>
-        <button class="btn primary" style="width:100%; justify-content:center" type="submit">Sign in</button>
-      </form>
+      <div id="step-name" class="hide">
+        <input id="nameFilter" placeholder="Find your name" style="width:100%; padding:12px; border:1px solid var(--line); border-radius:10px; margin-bottom:10px">
+        <div id="nameGrid" class="pickgrid tall"></div>
+        <button class="btn" id="btnNewStudent" style="width:100%; justify-content:center; margin-top:12px">My name isn't here</button>
+        <div id="newStudentBox" class="hide">
+          <label class="field"><span>Your full name</span><input id="newName" placeholder="First and last name" autocapitalize="words"></label>
+          <button class="btn primary" id="btnCreateStudent" style="width:100%; justify-content:center">Create my account</button>
+        </div>
+        <button class="btn ghost sm" id="backToClass" style="margin-top:10px">&larr; Change class</button>
+      </div>
+
+      <div id="step-pin" class="hide">
+        <p id="pinWho" class="small muted" style="margin-top:0"></p>
+        <label class="field"><span id="pinLabel">Your 4-digit PIN</span>
+          <input id="pinBox" inputmode="numeric" maxlength="4" placeholder="&bull;&bull;&bull;&bull;" style="font-family:var(--mono); font-size:1.6rem; text-align:center; letter-spacing:.4em"></label>
+        <button class="btn primary" id="btnPin" style="width:100%; justify-content:center">Go</button>
+        <button class="btn ghost sm" id="backToName" style="margin-top:10px">&larr; Not me</button>
+      </div>
 
       <div id="loginMsg"></div>
-      <div id="demoHint" class="notice info hide"></div>
     </div>
-  </div>
-</section>
 
-<!-- ============ CONFIRM CLASS ============ -->
-<section id="scr-confirm" class="hide">
-  <div class="auth">
-    <h1 id="confirmQ">Are you in this class?</h1>
-    <div class="card pad" style="text-align:center">
-      <div class="classbig mono" id="confirmBig"></div>
-      <button class="btn primary" id="btnConfirmClass" style="width:100%; justify-content:center; margin-top:14px">Yes, that's me</button>
-      <button class="btn ghost sm" id="btnWrongClass" style="margin-top:10px">No, I'm in another class</button>
-      <label class="field hide" id="confirmPick"><span>Choose your class</span><select id="confirmClass"></select></label>
+    <div style="text-align:center; margin-top:14px">
+      <button class="btn ghost sm" id="teacherLink">Teacher sign-in</button>
     </div>
+    <div class="card pad hide" id="teacherBox" style="margin-top:10px">
+      <form id="formTeacher">
+        <label class="field"><span>Email</span><input id="tEmail" type="email" autocomplete="username"></label>
+        <label class="field"><span>Password</span><input id="tPass" type="password" autocomplete="current-password"></label>
+        <button class="btn primary" style="width:100%; justify-content:center" type="submit">Sign in</button>
+      </form>
+    </div>
+    <div id="demoHint" class="notice info hide"></div>
   </div>
 </section>
 
@@ -318,7 +346,8 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
   <h1 id="gridTitle"></h1>
   <p class="muted small" id="phaseLine" style="margin:4px 0 0"></p>
   <div id="phaseMsg"></div>
-  <div id="ladders" style="margin-top:14px"></div>
+  <div id="compare" style="margin-top:14px"></div>
+  <div id="ladders"></div>
   <div id="notes"></div>
   <div class="savebar noprint" id="saveBar">
     <div class="progressline"><i id="progFill"></i></div>
@@ -330,13 +359,11 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
 <!-- ============ TEACHER ============ -->
 <section id="scr-teacher" class="hide">
   <nav class="tnav" id="tnav">
-    <button data-t="marks" aria-selected="true">Class marks</button>
-    <button data-t="windows" aria-selected="false">Windows</button>
-    <button data-t="awards" aria-selected="false">House &amp; Well Done points</button>
-    <button data-t="grids" aria-selected="false">Assessment grids</button>
+    <button data-t="marks" aria-selected="true">Marks</button>
+    <button data-t="awards" aria-selected="false">Points</button>
     <button data-t="programme" aria-selected="false">Programme</button>
-    <button data-t="students" aria-selected="false">Students</button>
-    <button data-t="settings" aria-selected="false">Settings</button>
+    <button data-t="grids" aria-selected="false">Grids</button>
+    <button data-t="setup" aria-selected="false">Setup</button>
   </nav>
 
   <!-- marks -->
@@ -354,19 +381,6 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
         S1 / S2 = student self-assessment (lesson 1, final). T1 / T2 / T3 = your marks (first, mid, final).
         <b>Gap</b> = how far the student's final self-assessment sits from your final mark, across the 5 skills.
       </p>
-    </div>
-  </div>
-
-  <!-- windows -->
-  <div id="t-windows" class="hide">
-    <div class="toolbar">
-      <label class="field"><span>Class</span><select id="wClass"></select></label>
-      <label class="field"><span>Sport</span><select id="wSport"></select></label>
-    </div>
-    <div class="card pad">
-      <h3>Open a phase to let students save</h3>
-      <p class="muted small">Students can only record or change a self-assessment while its window is open. Your own marks are never locked.</p>
-      <div class="grid-cards" id="winList" style="margin-top:12px"></div>
     </div>
   </div>
 
@@ -426,8 +440,10 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
   <!-- programme -->
   <div id="t-programme" class="hide">
     <div class="card pad">
-      <h3>Year group programme</h3>
-      <p class="muted small">This is the sport list each year group sees. Import it or add sports one at a time.</p>
+      <h3>Programme</h3>
+      <p class="muted small">Which class does which sport, in which term. Students can self-assess a sport while its term is the current one.</p>
+      <label class="field" style="max-width:220px; margin-top:12px"><span>Current term</span>
+        <select id="setTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
       <div class="toolbar" style="margin-top:12px">
         <label class="field"><span>Applies to</span><select id="pScope"></select></label>
         <label class="field"><span>Term</span><select id="pTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
@@ -449,47 +465,72 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
     </div>
   </div>
 
-  <!-- students -->
-  <div id="t-students" class="hide">
+  <!-- setup -->
+  <div id="t-setup" class="hide">
     <div class="card pad">
-      <h3>Students</h3>
+      <h3>Classes and access codes</h3>
+      <p class="muted small">Students must type their class code before they can see the names in that class. Leave a code empty to let anyone in.</p>
+      <div class="tablewrap" id="classTable" style="margin-top:12px"></div>
       <div class="toolbar" style="margin-top:12px">
+        <label class="field"><span>Add a class</span><input id="newClassName" placeholder="e.g. 8C" autocapitalize="characters"></label>
+        <label class="field"><span>Year group</span><input id="newClassYear" type="number" min="1" max="13" value="8"></label>
+        <button class="btn primary sm" id="btnAddClass">Add class</button>
+        <button class="btn sm" id="btnPrintCodes">Print class codes</button>
+      </div>
+    </div>
+
+    <div class="card pad" style="margin-top:14px">
+      <h3>Students</h3>
+      <p class="muted small">Upload your class list once. Students then just pick their name and choose a PIN.</p>
+      <div class="toolbar" style="margin-top:12px">
+        <input type="file" id="fileRoster" accept=".xlsx,.xls,.csv,.pdf" class="btn sm">
+        <label class="field"><span>Put everyone in</span><select id="rosterClass"></select></label>
+        <button class="btn primary sm" id="btnImportRoster">Import list</button>
+      </div>
+      <p class="tiny muted">Excel, CSV or PDF. If the file has a class column it is used; otherwise everyone goes into the class you pick.</p>
+      <div id="rosterMsg"></div>
+      <div id="rosterPreview"></div>
+      <hr style="border:0; border-top:1px solid var(--line); margin:16px 0">
+      <div class="toolbar">
         <label class="field"><span>Class</span><select id="stClass"></select></label>
-        <button class="btn sm" id="btnResetPins">Reset PINs for this class</button>
+        <button class="btn sm" id="btnResetPins">Clear PINs for this class</button>
         <button class="btn sm" id="btnExportStudents">Export CSV</button>
         <button class="btn sm" id="btnSlips">Print login slips</button>
       </div>
       <div class="tablewrap" id="studentTable"></div>
       <details class="help">
-        <summary>Import students from CSV</summary>
-        <pre>code,full_name,class_name,year_group,house,pin</pre>
+        <summary>Or paste a CSV</summary>
+        <pre>full_name,class_name,year_group,house</pre>
         <textarea class="csv" id="csvStudents"></textarea>
         <div class="btnrow" style="margin-top:8px">
-          <input type="file" id="fileStudents" accept=".csv" class="btn sm">
-          <button class="btn primary sm" id="btnImportStudents">Import students</button>
+          <button class="btn primary sm" id="btnImportStudents">Import pasted CSV</button>
         </div>
         <div id="studentMsg"></div>
       </details>
     </div>
   </div>
 
-  <!-- settings -->
-  <div id="t-settings" class="hide">
+  <div>
     <div class="card pad">
       <h3>Points</h3>
-      <p class="muted small">Change any number at any time. New values apply the next time points are issued.</p>
+      <p class="muted small">What each level is worth in your final mark, and how house points convert.</p>
       <div class="setgrid" style="margin-top:12px">
         <label class="field"><span>Level 1 is worth</span><input type="number" id="setL1" min="0"></label>
         <label class="field"><span>Level 2 is worth</span><input type="number" id="setL2" min="0"></label>
         <label class="field"><span>Level 3 is worth</span><input type="number" id="setL3" min="0"></label>
         <label class="field"><span>Level 4 is worth</span><input type="number" id="setL4" min="0"></label>
-        <label class="field"><span>Per self-assessment completed</span><input type="number" id="setSelfBonus" min="0"></label>
-        <label class="field"><span>Per level gained (T1 &rarr; T3)</span><input type="number" id="setProgBonus" min="0"></label>
-        <label class="field"><span>Honesty bonus (all 5 within 1 level)</span><input type="number" id="setHonesty" min="0"></label>
         <label class="field"><span>House points per Well Done point</span><input type="number" id="setWd" min="1"></label>
-        <label class="field"><span>Current term</span><select id="setTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
       </div>
-      <div class="btnrow" style="margin-top:6px">
+      <details class="help">
+        <summary>Bonus house points</summary>
+        <div class="setgrid" style="margin-top:10px">
+          <label class="field"><span>Per self-assessment completed</span><input type="number" id="setSelfBonus" min="0"></label>
+          <label class="field"><span>Per level gained (T1 &rarr; T3)</span><input type="number" id="setProgBonus" min="0"></label>
+          <label class="field"><span>Honest self-assessment bonus</span><input type="number" id="setHonesty" min="0"></label>
+        </div>
+        <p class="tiny muted">Set any of these to 0 to switch it off.</p>
+      </details>
+      <div class="btnrow" style="margin-top:12px">
         <button class="btn primary" id="btnSaveSettings">Save settings</button>
       </div>
       <div id="setMsg"></div>
@@ -532,7 +573,7 @@ const store = {
   set: (k, v) => { try { LS_OK ? localStorage.setItem(k, v) : (MEM[k] = v); } catch { MEM[k] = v; } }
 };
 const LEVEL_NAME = ['', 'Needs work', 'Developing', 'Proficient', 'Advanced'];
-const T = { settings:'aa_settings', students:'aa_students', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', windows:'aa_windows', marks:'aa_marks', awards:'aa_awards' };
+const T = { settings:'aa_settings', students:'aa_students', classes:'aa_classes', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', marks:'aa_marks', awards:'aa_awards' };
 
 /* ============================================================
    DATA LAYER — same API for Supabase and for demo mode
@@ -607,7 +648,7 @@ const DB = {
 /* ---------- app state ---------- */
 const S = {
   settings: null, user: null, role: null,
-  students: [], programme: [], grids: [], skills: [], windows: [], marks: [], awards: [],
+  students: [], classes: [], roster: [], programme: [], grids: [], skills: [], marks: [], awards: [],
   sport: null, grid: null, phase: 'self1', draft: {}
 };
 const STUDENT_COLS = 'id,code,full_name,class_name,year_group,house,wd_carry';
@@ -849,7 +890,7 @@ function seedDemo(force){
     ['S8A07','Grace Nkemi','8A',8,'Green Griffins'], ['S8A08','Hugo Lefevre','8A',8,'Yellow Yetis'],
     ['S8B01','Ines Ferrer','8B',8,'Red Dragon'], ['S8B02','Jonas Weber','8B',8,'Blue Phoenix'],
     ['S7A01','Kaya Tanaka','7A',7,'Green Griffins'], ['S7A02','Liam Byrne','7A',7,'Yellow Yetis']
-  ].map(([code,full_name,class_name,year_group,house], i) => ({ id:100+i, code, full_name, class_name, year_group, house, pin:'1234', wd_carry:0 }));
+  ].map(([code,full_name,class_name,year_group,house], i) => ({ id:100+i, code, full_name, class_name, year_group, house, pin: i < 4 ? '1234' : '', wd_carry:0 }));
 
   const programme = [
     [7,'Gymnastics','Term 1'], [7,'Dance','Term 1'], [7,'Handball','Term 2'], [7,'Badminton','Term 2'], [7,'Athletics','Term 3'], [7,'Swimming speed','Term 3'],
@@ -857,7 +898,7 @@ function seedDemo(force){
     [9,'Rugby','Term 1'], [9,'Netball','Term 1'], [9,'Ultimate frisbee','Term 2'], [9,'Fitness','Term 2'], [9,'Athletics','Term 3'], [9,'Pickleball','Term 3'],
     [10,'Fitness','Term 1'], [10,'Gym','Term 1'], [10,'Volleyball','Term 2'], [10,'Swimming speed','Term 2'], [10,'Badminton','Term 3'], [10,'Pickleball','Term 3'],
     [11,'Gym','Term 1'], [11,'Fitness','Term 1'], [11,'Basketball','Term 2'], [11,'Swimming endurance','Term 2'], [11,'Handball','Term 3'], [11,'Dance','Term 3']
-  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, class_name:'', sport, term, sort:i }));
+  ].map(([year_group,sport,term], i) => ({ id:200+i, year_group, class_name:'', sport, term, final_open:false, sort:i }));
 
   const grids = [], sk = [];
   let gid = 300, kid = 400;
@@ -875,10 +916,6 @@ function seedDemo(force){
   }
   const bball = grids.find(g => g.sport === 'Basketball' && g.year_group === 78).id;
 
-  const windows = [
-    { id:500, class_name:'8A', sport:'Basketball', phase:'self1', is_open:true },
-    { id:501, class_name:'8A', sport:'Basketball', phase:'self2', is_open:false }
-  ];
   const marks = [];
   let mid = 600;
   const t1 = { 100:[1,2,1,2,1], 101:[2,2,2,3,2], 102:[3,3,2,3,3], 103:[2,1,2,2,2], 104:[3,2,3,3,2], 105:[1,1,2,2,1], 106:[2,3,3,3,3], 107:[3,3,3,4,3] };
@@ -886,8 +923,10 @@ function seedDemo(force){
   for (const sid in t1) t1[sid].forEach((l, i) => marks.push({ id:mid++, student_id:+sid, grid_id:bball, phase:'t1', skill_idx:i+1, level:l }));
   for (const sid in s1) s1[sid].forEach((l, i) => marks.push({ id:mid++, student_id:+sid, grid_id:bball, phase:'self1', skill_idx:i+1, level:l }));
 
+  const classes = [['7A',7],['8A',8],['8B',8]].map(([class_name, year_group]) => ({ class_name, year_group, join_code: class_name + '-PE' }));
+  DB._save(T.classes, classes);
   DB._save(T.students, students); DB._save(T.programme, programme); DB._save(T.grids, grids);
-  DB._save(T.skills, sk); DB._save(T.windows, windows); DB._save(T.marks, marks); DB._save(T.awards, []);
+  DB._save(T.skills, sk); DB._save(T.marks, marks); DB._save(T.awards, []);
   DB._save(T.settings, [{ id:1, data: DEFAULT_SETTINGS }]);
   store.set('aa::seeded', '1');
 }
@@ -896,20 +935,29 @@ function seedDemo(force){
    LOAD
    ============================================================ */
 async function loadCore(){
-  const [settings, students, programme, grids, skills, windows, awards] = await Promise.all([
-    DB.select(T.settings), DB.select(T.students, null, S.role === 'teacher' ? '*' : STUDENT_COLS), DB.select(T.programme),
-    DB.select(T.grids), DB.select(T.skills), DB.select(T.windows),
-    S.role === 'teacher' ? Promise.resolve([]) : DB.select(T.awards, { student_id: S.user.id })
+  const canList = DB.mode === 'demo' || S.role === 'teacher';
+  const [settings, students, classes, programme, grids, skills, awards] = await Promise.all([
+    DB.select(T.settings),
+    canList ? DB.select(T.students, null, '*') : Promise.resolve([]),
+    DB.select(T.classes, null, DB.mode === 'demo' || S.role === 'teacher' ? '*' : 'class_name,year_group'),
+    DB.select(T.programme),
+    DB.select(T.grids), DB.select(T.skills),
+    (S.role === 'teacher' || !S.user) ? Promise.resolve([]) : DB.select(T.awards, { student_id: S.user.id })
   ]);
   S.settings = { ...DEFAULT_SETTINGS, ...((settings[0] && settings[0].data) || {}) };
-  S.students = students; S.programme = programme; S.grids = grids;
-  S.skills = skills; S.windows = windows; S.awards = awards;
+  S.students = students; S.classes = classes; S.programme = programme; S.grids = grids;
+  S.skills = skills; S.awards = awards;
 }
 const gridFor = (sport, year) => S.grids.find(g => g.sport === sport && +g.year_group === +year)
   || S.grids.find(g => g.sport === sport && +g.year_group === bandOf(year))
   || S.grids.find(g => g.sport === sport && +g.year_group === 0) || null;
 const skillsOf = gid => S.skills.filter(s => s.grid_id === gid).sort((a,b) => a.idx - b.idx);
-const winOpen = (cls, sport, phase) => { const w = S.windows.find(w => w.class_name === cls && w.sport === sport && w.phase === phase); return !!(w && w.is_open); };
+function progRow(cls, year, sport){ return progFor(cls, year).find(p => p.sport === sport) || null; }
+function selfOpen(cls, year, sport, phase){
+  const p = progRow(cls, year, sport);
+  if (!p || (p.term || '') !== (S.settings.currentTerm || '')) return false;
+  return phase === 'self1' ? true : !!p.final_open;
+}
 const markOf = (sid, gid, phase, idx) => S.marks.find(m => m.student_id === sid && m.grid_id === gid && m.phase === phase && m.skill_idx === idx);
 async function loadMarks(gid, ids){
   if (!gid || !ids.length) return;
@@ -925,33 +973,152 @@ const nSkills = gid => S.skills.filter(k => String(k.grid_id) === String(gid)).l
 const phaseDone = (sid, gid, phase) => { const n = nSkills(gid); return n > 0 && S.marks.filter(m => m.student_id === sid && String(m.grid_id) === String(gid) && m.phase === phase && m.level).length === n; };
 
 /* ============================================================
-   LOGIN
+   LOGIN — class, name, PIN
    ============================================================ */
-$('#tabStudent').onclick = () => { $('#tabStudent').setAttribute('aria-selected','true'); $('#tabTeacher').setAttribute('aria-selected','false'); $('#formStudent').classList.remove('hide'); $('#formTeacher').classList.add('hide'); msg('#loginMsg',''); };
-$('#tabTeacher').onclick = () => { $('#tabTeacher').setAttribute('aria-selected','true'); $('#tabStudent').setAttribute('aria-selected','false'); $('#formTeacher').classList.remove('hide'); $('#formStudent').classList.add('hide'); msg('#loginMsg',''); };
+const L = { cls:'', code:'', student:null, isNew:false };
+const slug = t => t.trim().toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-|-$/g,'');
+const step = id => ['#step-class','#step-code','#step-name','#step-pin'].forEach(x => $(x).classList.toggle('hide', x !== id));
 
-$('#formStudent').onsubmit = e => { e.preventDefault(); studentLogin($('#sCode').value.trim().toUpperCase(), $('#sPin').value.trim()); };
-async function studentLogin(code, pin){
-  let me = null;
-  if (DB.mode === 'supabase'){
-    const { data, error } = await DB.sb.rpc('aa_login', { p_code: code, p_pin: pin });
-    if (error) return msg('#loginMsg', 'Sign-in failed: ' + error.message, 'err');
-    me = (data || [])[0];
-    if (!me) return msg('#loginMsg', 'That ID and PIN do not match. Your teacher can reset your PIN.', 'err');
-  } else {
-    const rows = await DB.select(T.students, { code });
-    if (!rows.length) return msg('#loginMsg', 'No student found with that ID. Check it with your teacher.', 'err');
-    if (String(rows[0].pin) !== pin) return msg('#loginMsg', 'Wrong PIN. Your teacher can reset it.', 'err');
-    me = rows[0];
-  }
-  S.user = me; S.role = 'student';
+async function startLogin(){
+  S.role = 'student';
   await loadCore();
-  S.user = S.students.find(s => s.id === S.user.id) || S.user;
-  S.marks = await DB.select(T.marks, { student_id: S.user.id });
-  headerFor(S.user.full_name, `${S.user.class_name} · ${S.user.house}`);
-  renderConfirm();
+  const classes = S.classes.length ? S.classes.map(c => c.class_name).sort()
+    : uniq(S.students.map(s => s.class_name)).filter(Boolean).sort();
+  $('#classGrid').innerHTML = classes.map(c => `<button class="pick" data-cls="${esc(c)}">${esc(c)}</button>`).join('')
+    || '<p class="muted small" style="grid-column:1/-1">No classes yet — your teacher adds them in Setup.</p>';
+  $$('#classGrid .pick').forEach(b => b.onclick = () => pickClass(b.dataset.cls));
+  $('#loginH').textContent = 'Which class are you in?';
+  $('#loginSub').textContent = "Three taps and you're in.";
+  step('#step-class'); msg('#loginMsg',''); show('#scr-login');
 }
+$('#backToClass').onclick = () => startLogin();
 
+function needsCode(cls){
+  const c = S.classes.find(x => x.class_name === cls);
+  if (!c) return false;
+  return DB.mode === 'demo' ? !!(c.join_code || '') : c.has_code !== false;
+}
+function pickClass(cls){
+  L.cls = cls; L.code = '';
+  const c = S.classes.find(x => x.class_name === cls);
+  if (DB.mode === 'demo' && c && !(c.join_code || '')) return openRoster(cls, '');
+  if (DB.mode !== 'demo' || (c && (c.join_code || ''))){
+    $('#loginH').textContent = 'Class code';
+    $('#loginSub').textContent = cls;
+    $('#codeBox').value = ''; msg('#loginMsg','');
+    step('#step-code');
+    setTimeout(() => $('#codeBox').focus(), 50);
+    return;
+  }
+  openRoster(cls, '');
+}
+$('#btnCode').onclick = () => openRoster(L.cls, $('#codeBox').value.trim());
+$('#backFromCode').onclick = () => startLogin();
+
+async function openRoster(cls, code){
+  L.cls = cls; L.code = code;
+  try {
+    if (DB.mode === 'supabase'){
+      const { data, error } = await DB.sb.rpc('aa_roster', { p_class: cls, p_code: code });
+      if (error) throw error;
+      S.roster = data || [];
+      const known = S.classes.find(x => x.class_name === cls);
+      if (!S.roster.length && known && code === '') throw new Error('Ask your teacher for the class code.');
+    } else {
+      const c = S.classes.find(x => x.class_name === cls);
+      if (c && (c.join_code || '') && (c.join_code || '').toUpperCase() !== code.toUpperCase())
+        return msg('#loginMsg', 'That class code is not right.', 'err');
+      S.roster = S.students.filter(s => s.class_name === cls);
+    }
+  } catch (e){ return msg('#loginMsg', e.message || 'That class code is not right.', 'err'); }
+  $('#loginH').textContent = 'Find your name';
+  $('#loginSub').textContent = cls;
+  $('#newStudentBox').classList.add('hide');
+  $('#btnNewStudent').classList.remove('hide');
+  $('#nameFilter').value = ''; msg('#loginMsg','');
+  drawNames();
+  step('#step-name');
+}
+function drawNames(){
+  const q = $('#nameFilter').value.trim().toLowerCase();
+  const list = S.roster.filter(s => !q || s.full_name.toLowerCase().includes(q))
+    .sort((a,b) => a.full_name.localeCompare(b.full_name));
+  $('#nameGrid').innerHTML = list.map(s => `<button class="pick" data-id="${s.id}">${esc(s.full_name)}</button>`).join('')
+    || '<p class="muted small">Nobody here yet. Tap the button below to add yourself.</p>';
+  $$('#nameGrid .pick').forEach(b => b.onclick = () => pickStudent(S.roster.find(s => String(s.id) === b.dataset.id)));
+}
+$('#nameFilter').oninput = drawNames;
+$('#btnNewStudent').onclick = () => { $('#newStudentBox').classList.remove('hide'); $('#btnNewStudent').classList.add('hide'); $('#newName').focus(); };
+$('#backToName').onclick = () => openRoster(L.cls, L.code);
+
+$('#btnCreateStudent').onclick = async () => {
+  const name = $('#newName').value.trim().replace(/\s+/g,' ');
+  if (name.split(' ').length < 2) return msg('#loginMsg', 'Please put your first name and your last name.', 'err');
+  const dupe = S.roster.find(s => s.full_name.toLowerCase() === name.toLowerCase());
+  if (dupe) return pickStudent(dupe);
+  try {
+    if (DB.mode === 'supabase'){
+      const { data, error } = await DB.sb.rpc('aa_signup', { p_class: L.cls, p_code: L.code, p_name: name });
+      if (error) throw error;
+      const me = (data || [])[0];
+      if (!me) throw new Error('Could not create the account.');
+      S.roster = S.roster.concat(me);
+      return pickStudent(me, true);
+    }
+    const year = (S.classes.find(c => c.class_name === L.cls) || {}).year_group || parseInt(L.cls, 10) || 7;
+    let code = `${L.cls}-${slug(name)}`, n = 1;
+    while (S.students.some(s => s.code === code)) code = `${L.cls}-${slug(name)}-${++n}`;
+    await DB.upsert(T.students, [{ code, full_name: name, class_name: L.cls, year_group: year, house: '', pin: '', wd_carry: 0 }], ['code']);
+    S.students = await DB.select(T.students, null, '*');
+    const me = S.students.find(s => s.code === code);
+    S.roster = S.roster.concat(me);
+    pickStudent(me, true);
+  } catch (e){ msg('#loginMsg', e.message || 'Could not create the account.', 'err'); }
+};
+
+function pickStudent(st, isNew){
+  if (!st) return;
+  L.student = st; L.isNew = !!isNew;
+  $('#loginH').textContent = isNew ? 'Choose a PIN' : 'Your PIN';
+  $('#loginSub').textContent = `${st.full_name} · ${st.class_name}`;
+  $('#pinWho').textContent = isNew ? 'Pick 4 digits you will remember. You need them every time.' : 'Ask your teacher if you have forgotten it.';
+  $('#pinLabel').textContent = isNew ? 'New 4-digit PIN' : '4-digit PIN';
+  $('#pinBox').value = '';
+  msg('#loginMsg','');
+  step('#step-pin');
+  setTimeout(() => $('#pinBox').focus(), 50);
+}
+$('#pinBox').oninput = () => { if ($('#pinBox').value.length === 4) $('#btnPin').click(); };
+$('#btnPin').onclick = async () => {
+  const pin = $('#pinBox').value.trim();
+  if (!/^\d{4}$/.test(pin)) return msg('#loginMsg', 'Four digits, please.', 'err');
+  const st = L.student;
+  if (DB.mode === 'supabase'){
+    const { data, error } = await DB.sb.rpc('aa_login', { p_code: st.code, p_pin: pin });
+    if (error) return msg('#loginMsg', 'Sign-in failed: ' + error.message, 'err');
+    if (!(data || []).length){
+      const { data: set, error: e2 } = await DB.sb.rpc('aa_set_pin', { p_code: st.code, p_pin: pin });
+      if (e2 || !(set || []).length) return msg('#loginMsg', 'That PIN is not right. Your teacher can clear it for you.', 'err');
+    }
+  } else {
+    const known = (S.students.find(x => x.id === st.id) || {}).pin;  // demo mode only
+    if (!known) await DB.update(T.students, { id: st.id }, { pin });
+    else if (String(known) !== pin) return msg('#loginMsg', 'That PIN is not right. Your teacher can clear it for you.', 'err');
+  }
+  S.user = st; S.role = 'student';
+  await loadCore();
+  S.user = S.students.find(x => x.id === st.id) || st;
+  if (!S.user.year_group) S.user.year_group = (S.classes.find(c => c.class_name === S.user.class_name) || {}).year_group || S.user.year_group;
+  S.marks = await DB.select(T.marks, { student_id: S.user.id });
+  headerFor(S.user.full_name, S.user.class_name);
+  renderStudentHome();
+};
+
+$('#teacherLink').onclick = () => {
+  const box = $('#teacherBox');
+  box.classList.toggle('hide');
+  if (!box.classList.contains('hide')) $('#tEmail').focus();
+};
 $('#formTeacher').onsubmit = e => { e.preventDefault(); teacherLogin($('#tEmail').value.trim(), $('#tPass').value); };
 async function teacherLogin(email, pass){
   if (DB.mode === 'supabase'){
@@ -975,36 +1142,10 @@ function headerFor(name, sub){
 }
 $('#btnLogout').onclick = async () => {
   if (DB.mode === 'supabase' && S.role === 'teacher') await DB.sb.auth.signOut();
-  S.user = null; S.role = null;
+  S.user = null; S.role = null; L.student = null;
   $('#whoBox').classList.add('hide'); $('#btnLogout').classList.add('hide');
-  $('#sPin').value = ''; $('#tPass').value = '';
-  show('#scr-login');
-};
-
-/* ============================================================
-   STUDENT — confirm class
-   ============================================================ */
-function renderConfirm(){
-  const classes = uniq(S.students.map(s => s.class_name)).sort();
-  $('#confirmBig').textContent = S.user.class_name;
-  $('#confirmPick').classList.add('hide');
-  $('#confirmClass').innerHTML = classes.map(c => `<option ${c === S.user.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
-  show('#scr-confirm');
-}
-$('#btnWrongClass').onclick = () => {
-  $('#confirmPick').classList.remove('hide');
-  $('#btnWrongClass').classList.add('hide');
-  $('#confirmClass').onchange = () => $('#confirmBig').textContent = $('#confirmClass').value;
-};
-$('#btnConfirmClass').onclick = async () => {
-  const cls = $('#confirmPick').classList.contains('hide') ? S.user.class_name : $('#confirmClass').value;
-  if (cls !== S.user.class_name){
-    const yr = (S.students.find(s => s.class_name === cls) || {}).year_group || S.user.year_group;
-    await DB.update(T.students, { id: S.user.id }, { class_name: cls, year_group: yr });
-    S.user.class_name = cls; S.user.year_group = yr;
-    headerFor(S.user.full_name, `${cls} · ${S.user.house}`);
-  }
-  renderStudentHome();
+  $('#teacherBox').classList.add('hide'); $('#tPass').value = '';
+  startLogin();
 };
 
 function progFor(cls, year){
@@ -1035,7 +1176,7 @@ function renderStudentHome(){
     const g = gridFor(p.sport, S.user.year_group);
     const st = ph => !g ? ''
       : phaseDone(S.user.id, g.id, ph) ? `<span class="chip done">&#10003; ${ph === 'self1' ? 'Lesson 1' : 'Final'}</span>`
-      : winOpen(S.user.class_name, p.sport, ph) ? `<span class="chip open">Do it now</span>`
+      : selfOpen(S.user.class_name, S.user.year_group, p.sport, ph) ? `<span class="chip open">Do it now</span>`
       : '';
     const chips = st('self1') + st('self2');
     return `<button class="sport" data-sport="${esc(p.sport)}" ${g ? '' : 'disabled'}>
@@ -1056,10 +1197,10 @@ function renderStudentHome(){
    STUDENT — the grid
    ============================================================ */
 function activePhase(sport, gid){
-  const cls = S.user.class_name;
-  if (winOpen(cls, sport, 'self1') && !phaseDone(S.user.id, gid, 'self1')) return 'self1';
-  if (winOpen(cls, sport, 'self2')) return 'self2';
-  if (winOpen(cls, sport, 'self1')) return 'self1';
+  const cls = S.user.class_name, yr = S.user.year_group;
+  if (selfOpen(cls, yr, sport, 'self1') && !phaseDone(S.user.id, gid, 'self1')) return 'self1';
+  if (selfOpen(cls, yr, sport, 'self2')) return 'self2';
+  if (selfOpen(cls, yr, sport, 'self1')) return 'self1';
   return null;
 }
 function openStudentGrid(sport){
@@ -1071,7 +1212,7 @@ function openStudentGrid(sport){
 }
 function renderLadders(){
   const g = S.grid, sk = skillsOf(g.id);
-  const open = winOpen(S.user.class_name, S.sport, S.phase);
+  const open = selfOpen(S.user.class_name, S.user.year_group, S.sport, S.phase);
   const saved = phaseDone(S.user.id, g.id, S.phase);
   $('#gridTitle').textContent = g.sport;
   $('#phaseLine').textContent = S.phase === 'self1' ? 'Lesson 1' : 'Final lesson';
@@ -1083,7 +1224,7 @@ function renderLadders(){
 
   msg('#phaseMsg',
     open ? (saved ? 'Saved. You can still change it.' : `Tap the description that sounds most like you, for each of the ${sk.length} skills. It saves on its own.`)
-         : (saved ? 'Saved. T1, T2 and T3 are your teacher\'s marks.' : 'Your teacher has not opened this yet.'),
+         : (saved ? 'Saved. T1, T2 and T3 are your teacher\'s marks.' : 'This sport is not in the current term. Have a read \u2014 you can fill it in when you start it.'),
     open && saved ? 'ok' : 'info');
 
   $('#ladders').innerHTML = sk.map(k => `<div class="skill">
@@ -1105,6 +1246,15 @@ function renderLadders(){
     updateProgress();
     saveOne(idx, +b.dataset.l);
   });
+  const both = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 'self2', k.idx)||{}).level }));
+  const anyCompare = both.some(x => x.a) && both.some(x => x.b);
+  $('#compare').innerHTML = !anyCompare ? '' : `<div class="card pad" style="margin-bottom:16px">
+      <span class="eyebrow">Lesson 1 &rarr; last lesson</span>
+      ${both.map(x => `<div class="cmp"><span>${esc(x.k.name)}</span>
+        <span><span class="lvlbadge lv${x.a||0}">${x.a||'·'}</span>
+        <span class="arrow">${x.b > x.a ? '&uarr;' : x.b && x.b < x.a ? '&darr;' : '&rarr;'}</span>
+        <span class="lvlbadge lv${x.b||0}">${x.b||'·'}</span></span></div>`).join('')}
+    </div>`;
   const notes = sk.filter(k => (k.notes||'').trim());
   $('#notes').innerHTML = !notes.length ? '' :
     `<h2 class="noteshead">Technical expectations &amp; deep understanding</h2>`
@@ -1136,7 +1286,7 @@ async function saveOne(idx, level){
    TEACHER
    ============================================================ */
 function openTeacher(){
-  fillClassSelects(); fillGridSelect();
+  ensureClasses().then(() => { renderClasses(); }); fillClassSelects(); fillGridSelect();
   switchTab('marks'); show('#scr-teacher');
 }
 $('#tnav').onclick = e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.t); };
@@ -1146,33 +1296,33 @@ function firstRun(){
     <p class="muted small">Nothing is in the database yet. Do these once and the app is ready.</p>
     <ol class="setup">
       <li><b>Load the sports.</b> Grids tab &rarr; <i>Load standard sports</i>. 15 sports, two age bands each.</li>
-      <li><b>Add your students.</b> Students tab &rarr; import a CSV of <span class="mono tiny">code, full_name, class_name, year_group, house</span>.</li>
+      <li><b>Add your students.</b> Setup tab &rarr; import a CSV of <span class="mono tiny">code, full_name, class_name, year_group, house</span>.</li>
       <li><b>Set the programme.</b> Programme tab &rarr; which sport each year group or class does in each term.</li>
     </ol>
     <div class="btnrow"><button class="btn primary sm" data-go="grids">Go to Grids</button>
-      <button class="btn sm" data-go="students">Go to Students</button></div></div>`;
+      <button class="btn sm" data-go="setup">Go to Setup</button></div></div>`;
   $$('#t-marks [data-go]').forEach(b => b.onclick = () => switchTab(b.dataset.go));
   return true;
 }
 function switchTab(t){
   $$('#tnav button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
-  ['marks','windows','awards','grids','programme','students','settings'].forEach(k => $('#t-'+k).classList.toggle('hide', k !== t));
+  ['marks','awards','programme','grids','setup'].forEach(k => $('#t-'+k).classList.toggle('hide', k !== t));
   if (t === 'marks' && firstRun()) return;
-  ({ marks:renderMarks, windows:renderWindows, awards:renderAwards, grids:renderGridEditor, programme:renderProgramme, students:renderStudents, settings:renderSettings }[t])();
+  ({ marks:renderMarks, awards:renderAwards, grids:renderGridEditor, programme:renderProgramme, setup:renderSetup }[t])();
 }
 function fillClassSelects(){
   const classes = uniq(S.students.map(s => s.class_name)).sort();
-  ['#mClass','#wClass','#aClass','#stClass'].forEach(sel => {
+  ['#mClass','#aClass','#stClass'].forEach(sel => {
     const cur = $(sel).value;
     $(sel).innerHTML = classes.map(c => `<option>${esc(c)}</option>`).join('');
     if (classes.includes(cur)) $(sel).value = cur;
   });
-  ['#mClass','#wClass','#aClass'].forEach(sel => $(sel).onchange = () => { fillSportSelect(sel, sel.replace('Class','Sport')); rerender(); });
+  ['#mClass','#aClass'].forEach(sel => $(sel).onchange = () => { fillSportSelect(sel, sel.replace('Class','Sport')); rerender(); });
   $('#stClass').onchange = renderStudents;
-  ['#mSport','#wSport','#aSport'].forEach(sel => $(sel).onchange = rerender);
-  fillSportSelect('#mClass','#mSport'); fillSportSelect('#wClass','#wSport'); fillSportSelect('#aClass','#aSport');
+  ['#mSport','#aSport'].forEach(sel => $(sel).onchange = rerender);
+  fillSportSelect('#mClass','#mSport'); fillSportSelect('#aClass','#aSport');
 }
-function rerender(){ const t = $('#tnav button[aria-selected="true"]').dataset.t; ({ marks:renderMarks, windows:renderWindows, awards:renderAwards }[t] || (()=>{}))(); }
+function rerender(){ const t = $('#tnav button[aria-selected="true"]').dataset.t; ({ marks:renderMarks, awards:renderAwards }[t] || (()=>{}))(); }
 function fillSportSelect(clsSel, sportSel){
   const cls = $(clsSel).value;
   const yr = (S.students.find(s => s.class_name === cls) || {}).year_group;
@@ -1274,24 +1424,6 @@ $('#btnExportMarks').onclick = () => {
   }));
   downloadCSV(`marks_${cls}_${sport}.csv`, [head, ...rows]);
 };
-
-/* ---------- windows ---------- */
-async function renderWindows(){
-  const cls = $('#wClass').value, sport = $('#wSport').value;
-  await loadMarks((gridFor(sport, (S.students.find(x => x.class_name === cls)||{}).year_group)||{}).id, classStudents(cls).map(k => k.id));
-  $('#winList').innerHTML = Object.keys(PHASES).filter(p => p.startsWith('self')).map(p => {
-    const on = winOpen(cls, sport, p);
-    const done = classStudents(cls).filter(k => { const g = gridFor(sport, k.year_group); return g && phaseDone(k.id, g.id, p); }).length;
-    return `<div class="win"><label class="switch"><input type="checkbox" data-p="${p}" ${on?'checked':''}><i></i></label>
-      <span><b>${p === 'self1' ? 'Lesson 1' : 'Final lesson'}</b><br><span class="tiny muted">${done} of ${classStudents(cls).length} saved</span></span></div>`;
-  }).join('');
-  $$('#winList input').forEach(c => c.onchange = async () => {
-    const w = S.windows.find(w => w.class_name === cls && w.sport === sport && w.phase === c.dataset.p);
-    await DB.upsert(T.windows, [{ ...(w ? { id: w.id } : {}), class_name: cls, sport, phase: c.dataset.p, is_open: c.checked }], ['class_name','sport','phase']);
-    S.windows = await DB.select(T.windows);
-    renderWindows();
-  });
-}
 
 /* ---------- awards ---------- */
 function computeAward(k, g, sk){
@@ -1590,27 +1722,47 @@ $('#btnDeleteGrid').onclick = async () => {
 /* ---------- programme ---------- */
 function renderProgramme(){
   $('#sportOptions').innerHTML = uniq(S.grids.map(g => g.sport)).map(sp => `<option value="${esc(sp)}">`).join('');
+  $('#setTerm').value = S.settings.currentTerm || 'Term 1';
   const years = uniq(S.students.map(s => +s.year_group)).sort();
   const classes = uniq(S.students.map(s => s.class_name)).sort();
   const cur = $('#pScope').value;
   $('#pScope').innerHTML = years.map(y => `<option value="Y${y}">Year ${y} — all classes</option>`).join('')
     + classes.map(c => `<option value="C${c}">${esc(c)} only</option>`).join('');
   if (cur) $('#pScope').value = cur;
-  const scopeLabel = p => p.class_name ? p.class_name : `Year ${p.year_group} (all)`;
+  const now = S.settings.currentTerm || '';
   const rows = S.programme.slice().sort((a,b) => (a.year_group - b.year_group)
     || String(a.class_name||'').localeCompare(String(b.class_name||''))
     || String(a.term||'').localeCompare(String(b.term||'')));
-  $('#progTable').innerHTML = `<table><thead><tr><th>Applies to</th><th>Term</th><th>Sport</th><th>Grid</th><th class="noprint"></th></tr></thead><tbody>
-    ${rows.map(p => `<tr>
-      <td class="namecell">${esc(scopeLabel(p))}</td><td class="tiny">${esc(p.term||'')}</td><td>${esc(p.sport)}</td>
-      <td class="tiny">${gridFor(p.sport, p.year_group) ? esc(gridFor(p.sport, p.year_group).title) : '<span class="muted">missing</span>'}</td>
-      <td class="noprint"><button class="btn sm danger" data-del="${p.id}">Remove</button></td></tr>`).join('')}
+  $('#progTable').innerHTML = `<table><thead><tr><th>Applies to</th><th>Term</th><th>Sport</th><th>Grid</th>
+    <th>Students can</th><th class="noprint"></th></tr></thead><tbody>
+    ${rows.map(p => {
+      const live = (p.term||'') === now;
+      return `<tr>
+      <td class="namecell">${esc(p.class_name ? p.class_name : 'Year ' + p.year_group + ' (all)')}</td>
+      <td class="tiny">${esc(p.term||'')} ${live ? '<span class="chip open">now</span>' : ''}</td>
+      <td>${esc(p.sport)}</td>
+      <td class="tiny">${gridFor(p.sport, p.year_group) ? esc(gridFor(p.sport, p.year_group).title) : '<span class="muted">no grid</span>'}</td>
+      <td class="tiny">${live
+        ? `<label class="inline"><input type="checkbox" data-fin="${p.id}" ${p.final_open ? 'checked' : ''}> also do the final one</label>`
+        : '<span class="muted">nothing (not this term)</span>'}</td>
+      <td class="noprint"><button class="btn sm danger" data-del="${p.id}">Remove</button></td></tr>`;
+    }).join('')}
     </tbody></table>`;
   $$('#progTable [data-del]').forEach(b => b.onclick = async () => {
     await DB.remove(T.programme, { id: isNaN(+b.dataset.del) ? b.dataset.del : +b.dataset.del });
     S.programme = await DB.select(T.programme); renderProgramme(); fillClassSelects();
   });
+  $$('#progTable [data-fin]').forEach(c => c.onchange = async () => {
+    const id = isNaN(+c.dataset.fin) ? c.dataset.fin : +c.dataset.fin;
+    await DB.update(T.programme, { id }, { final_open: c.checked });
+    S.programme = await DB.select(T.programme);
+  });
 }
+$('#setTerm').onchange = async () => {
+  S.settings = { ...S.settings, currentTerm: $('#setTerm').value };
+  await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
+  renderProgramme();
+};
 $('#btnAddProg').onclick = async () => {
   const sport = $('#pSport').value.trim(); if (!sport) return;
   const scope = $('#pScope').value;
@@ -1625,16 +1777,24 @@ $('#btnAddProg').onclick = async () => {
 /* ---------- students ---------- */
 function renderStudents(){
   const cls = $('#stClass').value;
-  $('#studentTable').innerHTML = `<table><thead><tr><th>ID</th><th>Name</th><th class="num">Year</th><th>House</th><th class="num">PIN</th><th class="num">Carry</th></tr></thead><tbody>
-    ${classStudents(cls).map(k => `<tr><td class="mono tiny">${esc(k.code)}</td><td class="namecell">${esc(k.full_name)}</td>
+  $('#studentTable').innerHTML = `<table><thead><tr><th>Name</th><th class="num">Year</th><th>House</th><th class="num">PIN</th><th class="num">Carry</th><th class="noprint"></th></tr></thead><tbody>
+    ${classStudents(cls).map(k => `<tr><td class="namecell">${esc(k.full_name)}</td>
       <td class="num">${k.year_group}</td><td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
-      <td class="num mono">${esc(k.pin)}</td><td class="num">${k.wd_carry||0}</td></tr>`).join('')}
+      <td class="num mono">${k.pin ? esc(k.pin) : '<span class="muted">not set</span>'}</td><td class="num">${k.wd_carry||0}</td>
+      <td class="noprint"><button class="btn sm danger" data-rm="${k.id}">Remove</button></td></tr>`).join('')}
     </tbody></table>`;
+  $$('#studentTable [data-rm]').forEach(b => b.onclick = async () => {
+    const k = S.students.find(x => String(x.id) === b.dataset.rm);
+    if (!confirm(`Remove ${k.full_name} and all their marks? Use this for duplicates.`)) return;
+    await DB.remove(T.marks, { student_id: k.id }); await DB.remove(T.awards, { student_id: k.id });
+    await DB.remove(T.students, { id: k.id });
+    S.students = await DB.select(T.students, null, '*'); fillClassSelects(); renderStudents();
+  });
 }
 $('#btnResetPins').onclick = async () => {
   const cls = $('#stClass').value;
-  if (!confirm(`Give every student in ${cls} a new random PIN?`)) return;
-  for (const k of classStudents(cls)) await DB.update(T.students, { id: k.id }, { pin: String(Math.floor(1000 + Math.random()*9000)) });
+  if (!confirm(`Clear the PIN for every student in ${cls}? They will choose a new one next time they sign in.`)) return;
+  for (const k of classStudents(cls)) await DB.update(T.students, { id: k.id }, { pin: '' });
   S.students = await DB.select(T.students, null, '*'); renderStudents();
 };
 $('#btnSlips').onclick = () => {
@@ -1657,6 +1817,157 @@ $('#btnExportStudents').onclick = () => {
 };
 
 /* ---------- settings ---------- */
+
+/* ---------- classes and access codes ---------- */
+const mkCode = cls => cls.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,3) + '-' +
+  Math.random().toString(36).slice(2,5).toUpperCase();
+async function ensureClasses(){
+  const named = uniq(S.students.map(s => s.class_name)).filter(Boolean);
+  const missing = named.filter(c => !S.classes.some(x => x.class_name === c));
+  if (!missing.length) return;
+  await DB.upsert(T.classes, missing.map(c => ({
+    class_name: c,
+    year_group: (S.students.find(s => s.class_name === c) || {}).year_group || parseInt(c,10) || 7,
+    join_code: mkCode(c)
+  })), ['class_name']);
+  S.classes = await DB.select(T.classes);
+}
+function renderClasses(){
+  const rows = S.classes.slice().sort((a,b) => a.class_name.localeCompare(b.class_name));
+  $('#classTable').innerHTML = `<table><thead><tr><th>Class</th><th class="num">Year</th><th>Code students type</th><th class="num">Students</th><th class="noprint"></th></tr></thead><tbody>
+    ${rows.map(c => `<tr>
+      <td class="namecell">${esc(c.class_name)}</td>
+      <td class="num">${c.year_group}</td>
+      <td><input class="codein mono" data-code="${esc(c.class_name)}" value="${esc(c.join_code||'')}" placeholder="no code" style="width:120px; padding:5px 7px; border:1px solid var(--line); border-radius:7px; text-transform:uppercase"></td>
+      <td class="num">${S.students.filter(s => s.class_name === c.class_name).length}</td>
+      <td class="noprint"><button class="btn sm" data-newcode="${esc(c.class_name)}">New code</button></td></tr>`).join('')}
+    </tbody></table>`;
+  $$('#classTable .codein').forEach(i => i.onchange = async () => {
+    await DB.update(T.classes, { class_name: i.dataset.code }, { join_code: i.value.trim().toUpperCase() });
+    S.classes = await DB.select(T.classes);
+  });
+  $$('#classTable [data-newcode]').forEach(b => b.onclick = async () => {
+    await DB.update(T.classes, { class_name: b.dataset.newcode }, { join_code: mkCode(b.dataset.newcode) });
+    S.classes = await DB.select(T.classes); renderClasses();
+  });
+  const cur = $('#rosterClass').value;
+  $('#rosterClass').innerHTML = rows.map(c => `<option>${esc(c.class_name)}</option>`).join('') || '<option value="">add a class first</option>';
+  if (cur) $('#rosterClass').value = cur;
+}
+$('#btnAddClass').onclick = async () => {
+  const name = $('#newClassName').value.trim().toUpperCase(); if (!name) return;
+  await DB.upsert(T.classes, [{ class_name: name, year_group: +$('#newClassYear').value || 7, join_code: mkCode(name) }], ['class_name']);
+  S.classes = await DB.select(T.classes); $('#newClassName').value = '';
+  renderClasses(); fillClassSelects();
+};
+$('#btnPrintCodes').onclick = () => {
+  $('#slipArea').innerHTML = `<h2 class="sliphead">Class access codes</h2><div class="slips">`
+    + S.classes.slice().sort((a,b) => a.class_name.localeCompare(b.class_name)).map(c => `<div class="slip">
+        <div class="slipname">${esc(c.class_name)}</div>
+        <div class="sliprow"><span>Class code</span><b class="mono">${esc(c.join_code || 'none')}</b></div>
+        <div class="slipfoot">Type this, then pick your name and choose a PIN.</div></div>`).join('')
+    + '</div>';
+  document.body.classList.add('slips'); window.print();
+  setTimeout(() => document.body.classList.remove('slips'), 500);
+};
+
+/* ---------- roster import: xlsx, csv or pdf ---------- */
+const HEAD = {
+  first: /^(first ?name|pr[ée]nom|given)/i,
+  last:  /^(last ?name|surname|nom de famille|family)/i,
+  full:  /^(full ?name|name|student ?name|student|[ée]l[èe]ve|nom complet|nom et pr[ée]nom|nom)$/i,
+  cls:   /^(class|classe|group|groupe|division|form)/i,
+  year:  /^(year|ann[ée]e|niveau|grade|level)/i,
+  house: /^(house|maison)/i
+};
+function rowsToStudents(rows, fallbackClass){
+  let head = -1, map = {};
+  for (let r = 0; r < Math.min(rows.length, 12); r++){
+    const m = {};
+    rows[r].forEach((cell, i) => {
+      const t = String(cell || '').trim();
+      for (const k in HEAD) if (HEAD[k].test(t) && m[k] === undefined) m[k] = i;
+    });
+    // "Nom" alongside "Prénom" is a surname column, not a full name
+    if (m.first !== undefined && m.last === undefined && m.full !== undefined){ m.last = m.full; delete m.full; }
+    if (m.full !== undefined || m.first !== undefined || m.last !== undefined){ head = r; map = m; break; }
+  }
+  const out = [];
+  const push = (name, cls, yr, house, strict) => {
+    name = String(name||'').replace(/\s+/g,' ').trim();
+    if (!name || (strict && name.split(' ').length < 2)) return;
+    if (/^(name|nom|pr[ée]nom|student|[ée]l[èe]ve|total|classe|class)$/i.test(name)) return;
+    cls = String(cls || fallbackClass || '').trim().toUpperCase();
+    if (!cls) return;
+    out.push({ full_name: name, class_name: cls, year_group: +yr || parseInt(cls,10) || 7, house: String(house||'').trim() });
+  };
+  if (head >= 0){
+    for (let r = head+1; r < rows.length; r++){
+      const c = rows[r];
+      const name = map.full !== undefined ? c[map.full]
+        : [c[map.first], c[map.last]].filter(Boolean).join(' ');
+      push(name, map.cls !== undefined ? c[map.cls] : '', map.year !== undefined ? c[map.year] : '',
+           map.house !== undefined ? c[map.house] : '', false);
+    }
+  } else {
+    rows.forEach(c => push(c[0], c[1], c[2], c[3], true));
+  }
+  return out;
+}
+async function readRoster(file, fallbackClass){
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.pdf')){
+    const pg = await pdfPages(file);
+    const rows = [];
+    for (const p of pg) for (const l of linesOf(p.items)) rows.push([l.items.map(i => i.str).join(' ').replace(/^\d+[.)]?\s*/,'')]);
+    return rowsToStudents(rows, fallbackClass);
+  }
+  if (name.endsWith('.csv')) return rowsToStudents(parseCSV(await file.text()), fallbackClass);
+  const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+  const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type:'array' });
+  const rows = [];
+  wb.SheetNames.forEach(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header:1, blankrows:false })
+    .forEach(r => rows.push(r.map(c => c == null ? '' : c))));
+  return rowsToStudents(rows, fallbackClass);
+}
+let rosterDraft = [];
+$('#fileRoster').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  msg('#rosterMsg', 'Reading the file…', 'info'); $('#rosterPreview').innerHTML = '';
+  try {
+    rosterDraft = await readRoster(f, $('#rosterClass').value);
+    if (!rosterDraft.length) throw new Error('No names found. The file needs a name column, or one full name per line.');
+    const byClass = {};
+    rosterDraft.forEach(r => byClass[r.class_name] = (byClass[r.class_name]||0) + 1);
+    $('#rosterPreview').innerHTML = `<div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Name</th><th>Class</th><th class="num">Year</th></tr></thead><tbody>
+      ${rosterDraft.slice(0,8).map(r => `<tr><td class="namecell">${esc(r.full_name)}</td><td>${esc(r.class_name)}</td><td class="num">${r.year_group}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    msg('#rosterMsg', `${rosterDraft.length} students found (${Object.entries(byClass).map(([c,n]) => c+': '+n).join(', ')}). Check the first rows, then Import.`, 'ok');
+  } catch (err){ msg('#rosterMsg', err.message, 'err'); rosterDraft = []; }
+};
+$('#btnImportRoster').onclick = async () => {
+  if (!rosterDraft.length) return msg('#rosterMsg', 'Choose a file first.', 'err');
+  try {
+    const classes = uniq(rosterDraft.map(r => r.class_name));
+    await DB.upsert(T.classes, classes.filter(c => !S.classes.some(x => x.class_name === c)).map(c => ({
+      class_name: c, year_group: (rosterDraft.find(r => r.class_name === c)||{}).year_group || 7, join_code: mkCode(c)
+    })), ['class_name']);
+    const rows = rosterDraft.map(r => {
+      const ex = S.students.find(s => s.class_name === r.class_name && s.full_name.toLowerCase() === r.full_name.toLowerCase());
+      let code = `${r.class_name}-${slug(r.full_name)}`, n = 1;
+      while (!ex && S.students.some(s => s.code === code)) code = `${r.class_name}-${slug(r.full_name)}-${++n}`;
+      return ex ? { id: ex.id, ...r } : { code, ...r, pin: '', wd_carry: 0 };
+    });
+    await DB.upsert(T.students, rows, ['code']);
+    S.students = await DB.select(T.students, null, '*');
+    S.classes = await DB.select(T.classes);
+    rosterDraft = []; $('#fileRoster').value = ''; $('#rosterPreview').innerHTML = '';
+    fillClassSelects(); renderClasses(); renderStudents();
+    msg('#rosterMsg', `${rows.length} students ready. Give each class its code and they can sign in.`, 'ok');
+  } catch (err){ msg('#rosterMsg', err.message, 'err'); }
+};
+
+function renderSetup(){ renderClasses(); renderStudents(); renderSettings(); }
 function renderSettings(){
   const s = S.settings;
   $('#setL1').value = s.l1; $('#setL2').value = s.l2; $('#setL3').value = s.l3; $('#setL4').value = s.l4;
@@ -1703,13 +2014,13 @@ function downloadCSV(name, rows){
   a.download = name; a.click(); URL.revokeObjectURL(a.href);
 }
 function wireFile(inputSel, areaSel){ $(inputSel).onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => $(areaSel).value = r.result; r.readAsText(f); }; }
-wireFile('#fileGrid','#csvGrid'); wireFile('#fileProg','#csvProg'); wireFile('#fileStudents','#csvStudents');
+wireFile('#fileGrid','#csvGrid'); wireFile('#fileProg','#csvProg');
 
 $('#btnImportStudents').onclick = async () => {
   try {
     const objs = toObjects(parseCSV($('#csvStudents').value));
-    const rows = objs.map(o => ({ code: (o.code||'').toUpperCase(), full_name: o.full_name || o.name, class_name: o.class_name || o.class,
-      year_group: +(o.year_group || o.year || 0), house: o.house || '', pin: String(o.pin || Math.floor(1000+Math.random()*9000)), wd_carry: 0 }))
+    const rows = objs.map(o => ({ code: (o.code || `${(o.class_name||o.class||'').toUpperCase()}-${slug(o.full_name||o.name||'')}`).toUpperCase(), full_name: o.full_name || o.name, class_name: (o.class_name || o.class || '').toUpperCase(),
+      year_group: +(o.year_group || o.year || 0), house: o.house || '', pin: String(o.pin || ''), wd_carry: 0 }))
       .filter(r => r.code && r.full_name);
     if (!rows.length) throw new Error('No usable rows. Check the header line.');
     await DB.upsert(T.students, rows, ['code']);
@@ -1768,25 +2079,6 @@ $('#btnTplGrid').onclick = () => downloadCSV('grid_template.csv', [
    ============================================================ */
 (async function start(){
   await DB.init();
-  if (DB.mode === 'demo'){
-    $('#demoHint').classList.remove('hide');
-    const kids = (await DB.select(T.students)).slice(0, 4);
-    $('#demoHint').innerHTML = 'Demo mode — tap a name to sign in.'
-      + '<div class="btnrow" style="margin-top:9px">'
-      + kids.map(k => `<button class="btn sm" data-code="${k.code}" data-pin="${k.pin}">${esc(k.full_name.split(' ')[0])} · ${esc(k.class_name)}</button>`).join('')
-      + '<button class="btn sm primary" data-teacher="1">Teacher</button></div>'
-      + `<div class="tiny" style="margin-top:8px">Or type an ID: <b class="mono">${kids.map(k => k.code).join(' ')}</b> — PIN <b class="mono">${kids[0] ? kids[0].pin : '1234'}</b>. Teacher: any email, password <b class="mono">pe2026</b>.</div>`
-      + (LS_OK ? '' : '<div class="tiny" style="margin-top:6px">This preview cannot save between reloads. Everything works, but refreshing starts again.</div>');
-    $$('#demoHint [data-code]').forEach(b => b.onclick = () => {
-      $('#sCode').value = b.dataset.code; $('#sPin').value = b.dataset.pin;
-      studentLogin(b.dataset.code, b.dataset.pin);
-    });
-    $('#demoHint [data-teacher]').onclick = () => {
-      $('#tabTeacher').click(); $('#tEmail').value = 'teacher@school'; $('#tPass').value = 'pe2026';
-      teacherLogin('teacher@school', 'pe2026');
-    };
-
-  }
   if (DB.mode === 'supabase'){
     const { data } = await DB.sb.auth.getSession();
     if (data && data.session){
@@ -1795,7 +2087,13 @@ $('#btnTplGrid').onclick = () => downloadCSV('grid_template.csv', [
       headerFor('Teacher', S.user.email); openTeacher(); return;
     }
   }
-  show('#scr-login');
+  await startLogin();
+  if (DB.mode === 'demo'){
+    $('#demoHint').classList.remove('hide');
+    $('#demoHint').innerHTML = 'Demo mode. Tap a class, tap your name, then any 4 digits. Teacher password: <b class="mono">pe2026</b>.'
+      + ' Class codes: <b class="mono">8A-PE</b>, <b class="mono">8B-PE</b>, <b class="mono">7A-PE</b>.'
+      + (LS_OK ? '' : '<div class="tiny" style="margin-top:6px">This preview cannot save between reloads.</div>');
+  }
 })();
 
 </script>
