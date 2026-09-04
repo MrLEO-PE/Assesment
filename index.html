@@ -1163,7 +1163,8 @@ $('#btnShowRegister').onclick = async () => {
   if (box.classList.contains('hide')) return;
   msg('#loginMsg','');
   if (DB.mode !== 'supabase'){ $('#regHint').textContent = 'Demo mode: sign in with any email and the password pe2026.'; return; }
-  const { data: free } = await DB.sb.rpc('aa_teacher_seat_free');
+  const { data: free, error: fe } = await DB.sb.rpc('aa_teacher_seat_free');
+  if (fe){ $('#regHint').textContent = 'The database setup has not been run yet: paste supabase-setup.sql into the Supabase SQL editor and run it.'; return; }
   $('#regHint').textContent = free === false
     ? 'A teacher already exists. Ask them to add your email under Setup > Teachers, then create your account here.'
     : 'Nobody has claimed this school yet. The account you create becomes the teacher.';
@@ -1174,9 +1175,17 @@ $('#btnRegister').onclick = async () => {
   if (!email || pass.length < 8) return msg('#loginMsg', 'Enter an email and a password of at least 8 characters.', 'err');
   if (DB.mode !== 'supabase') return msg('#loginMsg', 'Demo mode has no accounts. Sign in with the password pe2026.', 'err');
   const { data, error } = await DB.sb.auth.signUp({ email, password: pass });
-  if (error) return msg('#loginMsg', /disabled|not allowed/i.test(error.message)
-    ? 'Sign-ups are switched off in Supabase. Turn on Authentication \u2192 Providers \u2192 Email \u2192 Enable sign ups, create the account, then switch it off again.'
-    : error.message, 'err');
+  if (error){
+    const m = error.message || '', st = error.status || 0;
+    let hint = m;
+    if (st === 429 || /rate limit/i.test(m))
+      hint = 'Supabase is rate-limiting sign-ups after several tries. Wait an hour, or create the user in the dashboard: Authentication \u2192 Users \u2192 Add user (tick Auto Confirm).';
+    else if (st === 500 || /sending|smtp|confirmation email|unexpected/i.test(m))
+      hint = 'Supabase could not send the confirmation email. Turn OFF Authentication \u2192 Providers \u2192 Email \u2192 Confirm email, then try again.';
+    else if (/disabled|not allowed/i.test(m))
+      hint = 'Sign-ups are switched off. Turn on Authentication \u2192 Providers \u2192 Email \u2192 Enable sign ups.';
+    return msg('#loginMsg', hint, 'err');
+  }
   if (!data.session){
     const { error: e2 } = await DB.sb.auth.signInWithPassword({ email, password: pass });
     if (e2) return msg('#loginMsg', 'Account created. Confirm the link sent to ' + email + ', then sign in. (Or switch off "Confirm email" in Supabase to skip that step.)', 'info');
