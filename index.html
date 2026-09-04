@@ -565,8 +565,8 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
    (data stays in this browser only).
    ============================================================ */
 const CONFIG = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: ''
+  SUPABASE_URL: 'https://rvhajegokljwastmylyy.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2aGFqZWdva2xqd2FzdG15bHl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0OTYwODksImV4cCI6MjEwNDA3MjA4OX0.yY7YmpeSlg9eKYSXaYTB74LTbEg1UsD4dR3KDCESKzY'
 };
 
 /* ---------- tiny helpers ---------- */
@@ -594,13 +594,17 @@ const DB = {
   mode: 'demo',
   sb: null,
   async init(){
-    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY){
-      const m = await import('https://esm.sh/@supabase/supabase-js@2');
-      this.sb = m.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-      this.mode = 'supabase';
-    } else {
-      seedDemo();
+    if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY){ seedDemo(); return; }
+    let m = null;
+    for (const src of ['https://esm.sh/@supabase/supabase-js@2',
+                       'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm']){
+      try { m = await import(src); break; } catch (e){ /* try the next one */ }
     }
+    if (!m) throw new Error('Could not load the database library. Check the internet connection, then reload.');
+    this.sb = m.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    this.mode = 'supabase';
+    const { error } = await this.sb.from(T.settings).select('id').limit(1);
+    if (error) throw new Error('Connected, but the database refused the request: ' + error.message);
   },
   _ls(t){ try { return JSON.parse(store.get('aa::'+t) || '[]'); } catch { return []; } },
   _save(t, rows){ store.set('aa::'+t, JSON.stringify(rows)); },
@@ -2128,8 +2132,13 @@ $('#btnTplGrid').onclick = () => downloadCSV('grid_template.csv', [
 /* ============================================================
    START
    ============================================================ */
+function fatal(text){
+  document.body.innerHTML = `<main class="wrap"><div class="auth"><h1>Something is not set up</h1>
+    <div class="card pad"><p>${esc(text)}</p>
+    <p class="tiny muted">If this keeps happening, check the two CONFIG lines at the top of the file and that the SQL setup ran.</p></div></div></main>`;
+}
 (async function start(){
-  await DB.init();
+  try { await DB.init(); } catch (e){ return fatal(e.message); }
   if (DB.mode === 'supabase'){
     const { data } = await DB.sb.auth.getSession();
     if (data && data.session){
@@ -2138,7 +2147,7 @@ $('#btnTplGrid').onclick = () => downloadCSV('grid_template.csv', [
       headerFor('Teacher', S.user.email); openTeacher(); return;
     }
   }
-  await startLogin();
+  try { await startLogin(); } catch (e){ return fatal(e.message || 'Could not reach the database.'); }
   if (DB.mode === 'demo'){
     $('#demoHint').classList.remove('hide');
     $('#demoHint').innerHTML = 'Demo mode. Tap a class, tap your name, then any 4 digits. Teacher password: <b class="mono">pe2026</b>.'
