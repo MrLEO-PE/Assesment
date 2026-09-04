@@ -323,6 +323,15 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <label class="field"><span>Password</span><input id="tPass" type="password" autocomplete="current-password"></label>
         <button class="btn primary" style="width:100%; justify-content:center" type="submit">Sign in</button>
       </form>
+      <div style="text-align:center; margin-top:12px">
+        <button class="btn ghost sm" id="btnShowRegister">Create a teacher account</button>
+      </div>
+      <div id="registerBox" class="hide" style="border-top:1px solid var(--line); margin-top:12px; padding-top:12px">
+        <p class="tiny muted" id="regHint" style="margin-top:0"></p>
+        <label class="field"><span>Email</span><input id="rEmail" type="email" autocomplete="username"></label>
+        <label class="field"><span>Password</span><input id="rPass" type="password" minlength="8" autocomplete="new-password" placeholder="at least 8 characters"></label>
+        <button class="btn primary" id="btnRegister" style="width:100%; justify-content:center">Create account</button>
+      </div>
     </div>
     <div id="demoHint" class="notice info hide"></div>
   </div>
@@ -489,6 +498,17 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <button class="btn primary sm" id="btnAddClass">Add class</button>
         <button class="btn sm" id="btnPrintCodes">Print class codes</button>
       </div>
+    </div>
+
+    <div class="card pad" style="margin-top:14px">
+      <h3>Teachers</h3>
+      <p class="muted small">Only these emails can edit anything. Add a colleague here, then they create their account on the sign-in screen.</p>
+      <div class="tablewrap" id="teacherTable" style="margin-top:12px"></div>
+      <div class="toolbar" style="margin-top:12px">
+        <label class="field"><span>Add a teacher</span><input id="newTeacher" type="email" placeholder="colleague@school.com"></label>
+        <button class="btn primary sm" id="btnAddTeacher">Add</button>
+      </div>
+      <div id="teacherMsg"></div>
     </div>
 
     <div class="card pad" style="margin-top:14px">
@@ -1136,6 +1156,38 @@ $('#teacherLink').onclick = () => {
   const box = $('#teacherBox');
   box.classList.toggle('hide');
   if (!box.classList.contains('hide')) $('#tEmail').focus();
+};
+$('#btnShowRegister').onclick = async () => {
+  const box = $('#registerBox');
+  box.classList.toggle('hide');
+  if (box.classList.contains('hide')) return;
+  msg('#loginMsg','');
+  if (DB.mode !== 'supabase'){ $('#regHint').textContent = 'Demo mode: sign in with any email and the password pe2026.'; return; }
+  const { data: free } = await DB.sb.rpc('aa_teacher_seat_free');
+  $('#regHint').textContent = free === false
+    ? 'A teacher already exists. Ask them to add your email under Setup > Teachers, then create your account here.'
+    : 'Nobody has claimed this school yet. The account you create becomes the teacher.';
+  $('#rEmail').focus();
+};
+$('#btnRegister').onclick = async () => {
+  const email = $('#rEmail').value.trim(), pass = $('#rPass').value;
+  if (!email || pass.length < 8) return msg('#loginMsg', 'Enter an email and a password of at least 8 characters.', 'err');
+  if (DB.mode !== 'supabase') return msg('#loginMsg', 'Demo mode has no accounts. Sign in with the password pe2026.', 'err');
+  const { data, error } = await DB.sb.auth.signUp({ email, password: pass });
+  if (error) return msg('#loginMsg', /disabled|not allowed/i.test(error.message)
+    ? 'Sign-ups are switched off in Supabase. Turn on Authentication \u2192 Providers \u2192 Email \u2192 Enable sign ups, create the account, then switch it off again.'
+    : error.message, 'err');
+  if (!data.session){
+    const { error: e2 } = await DB.sb.auth.signInWithPassword({ email, password: pass });
+    if (e2) return msg('#loginMsg', 'Account created. Confirm the link sent to ' + email + ', then sign in. (Or switch off "Confirm email" in Supabase to skip that step.)', 'info');
+  }
+  const { data: claimed, error: e3 } = await DB.sb.rpc('aa_claim_teacher', { p_email: email });
+  if (e3 || claimed === false){
+    await DB.sb.auth.signOut();
+    return msg('#loginMsg', 'Account created, but a teacher already exists. Ask them to add ' + email + ' under Setup \u2192 Teachers.', 'err');
+  }
+  msg('#loginMsg','');
+  await teacherLogin(email, pass);
 };
 $('#formTeacher').onsubmit = e => { e.preventDefault(); teacherLogin($('#tEmail').value.trim(), $('#tPass').value); };
 async function teacherLogin(email, pass){
@@ -2031,7 +2083,32 @@ $('#btnImportRoster').onclick = async () => {
   } catch (err){ msg('#rosterMsg', err.message, 'err'); }
 };
 
-function renderSetup(){ renderClasses(); renderStudents(); renderSettings(); }
+async function renderTeachers(){
+  if (DB.mode !== 'supabase'){ $('#teacherTable').innerHTML = '<p class="muted small">Demo mode: the teacher password is pe2026.</p>'; return; }
+  const { data, error } = await DB.sb.from('aa_teachers').select('email');
+  if (error) return;
+  const me = (S.user && S.user.email || '').toLowerCase();
+  $('#teacherTable').innerHTML = `<table><thead><tr><th>Email</th><th class="noprint"></th></tr></thead><tbody>
+    ${(data||[]).map(t => `<tr><td class="namecell">${esc(t.email)}${t.email.toLowerCase() === me ? ' <span class="chip">you</span>' : ''}</td>
+      <td class="noprint">${t.email.toLowerCase() === me ? '' : `<button class="btn sm danger" data-rmt="${esc(t.email)}">Remove</button>`}</td></tr>`).join('')}
+    </tbody></table>`;
+  $$('#teacherTable [data-rmt]').forEach(b => b.onclick = async () => {
+    if (!confirm(`Remove ${b.dataset.rmt}? They lose all editing rights.`)) return;
+    await DB.sb.from('aa_teachers').delete().eq('email', b.dataset.rmt);
+    renderTeachers();
+  });
+}
+$('#btnAddTeacher').onclick = async () => {
+  const email = $('#newTeacher').value.trim().toLowerCase();
+  if (!email) return;
+  if (DB.mode !== 'supabase') return msg('#teacherMsg', 'Demo mode has no accounts.', 'err');
+  const { error } = await DB.sb.from('aa_teachers').insert({ email });
+  if (error) return msg('#teacherMsg', error.message, 'err');
+  $('#newTeacher').value = '';
+  msg('#teacherMsg', `${email} can now create their account on the sign-in screen.`, 'ok');
+  renderTeachers();
+};
+function renderSetup(){ renderTeachers(); renderClasses(); renderStudents(); renderSettings(); }
 function renderSettings(){
   const s = S.settings;
   $('#setL1').value = s.l1; $('#setL2').value = s.l2; $('#setL3').value = s.l3; $('#setL4').value = s.l4;
