@@ -1141,7 +1141,9 @@ $('#formTeacher').onsubmit = e => { e.preventDefault(); teacherLogin($('#tEmail'
 async function teacherLogin(email, pass){
   if (DB.mode === 'supabase'){
     const { data, error } = await DB.sb.auth.signInWithPassword({ email, password: pass });
-    if (error) return msg('#loginMsg', 'Sign-in failed: ' + error.message, 'err');
+    if (error) return msg('#loginMsg', /invalid login/i.test(error.message)
+      ? 'No account with that email and password. Create the teacher user in Supabase: Authentication \u2192 Users \u2192 Add user, with Auto Confirm ticked.'
+      : 'Sign-in failed: ' + error.message, 'err');
     S.user = data.user;
   } else {
     if (pass !== 'pe2026') return msg('#loginMsg', 'Demo teacher password is pe2026.', 'err');
@@ -1149,6 +1151,13 @@ async function teacherLogin(email, pass){
   }
   S.role = 'teacher';
   await loadCore();
+  if (DB.mode === 'supabase'){
+    const { data: ok } = await DB.sb.rpc('is_teacher');
+    if (ok === false){
+      await DB.sb.auth.signOut(); S.role = null; S.user = null;
+      return msg('#loginMsg', 'That account is signed in but is not on the teacher list. Add its email to the aa_teachers table in Supabase.', 'err');
+    }
+  }
   S.marks = [];
   headerFor('Teacher', S.user.email || '');
   openTeacher();
