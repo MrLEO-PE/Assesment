@@ -78,6 +78,41 @@ a{color:var(--brand-2)}
 .tiny{font-size:.76rem}
 
 
+
+
+/* ---------- fast marking: tap-to-set levels ---------- */
+.lvlpick{ display:flex; gap:3px; justify-content:center }
+.lvlbtn, .setallbtn{
+  width:26px; height:26px; border-radius:6px; border:1px solid var(--line); background:#fff;
+  font-family:var(--mono); font-weight:600; font-size:.82rem; color:var(--muted); padding:0;
+}
+.lvlbtn:hover, .setallbtn:hover{ border-color:var(--brand-2) }
+.lvlbtn[aria-pressed="true"]{ color:#fff; border-color:transparent }
+.lvlbtn.lv1[aria-pressed="true"]{ background:var(--l1); color:var(--l1t) }
+.lvlbtn.lv2[aria-pressed="true"]{ background:var(--l2); color:var(--l2t) }
+.lvlbtn.lv3[aria-pressed="true"]{ background:var(--l3) }
+.lvlbtn.lv4[aria-pressed="true"]{ background:var(--l4) }
+th.setall{ font-weight:400; padding-top:4px; padding-bottom:6px }
+th.setall .btnrow{ margin-top:3px }
+.setallbtn{ width:20px; height:20px; font-size:.7rem }
+@media (pointer: coarse){
+  .lvlbtn{ width:34px; height:34px; font-size:.95rem }
+}
+/* ---------- global busy indicator ---------- */
+#busybar{
+  position:fixed; top:0; left:0; height:3px; width:0%; z-index:100;
+  background:linear-gradient(90deg, var(--brand-2), var(--gold));
+  opacity:0; transition:width .3s ease, opacity .2s ease;
+}
+body.busy-net #busybar{ opacity:1; width:70%; transition:width 3s cubic-bezier(.1,.6,.2,1), opacity .2s ease; }
+body.busy-net #busybar.done{ width:100%; transition:width .2s ease; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.spin{
+  display:inline-block; width:13px; height:13px; border-radius:50%;
+  border:2px solid currentColor; border-top-color:transparent; opacity:.75;
+  animation:spin .7s linear infinite; margin-right:7px; vertical-align:-2px; flex:none;
+}
+.btn.busy{ opacity:.75; cursor:wait; pointer-events:none; }
 /* ---------- login pickers ---------- */
 .pickgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px}
 .pickgrid.tall{grid-template-columns:1fr; max-height:46vh; overflow-y:auto; gap:6px}
@@ -258,6 +293,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 </head>
 <body>
 
+<div id="busybar"></div>
 <header class="topbar">
   <div class="topbar-in">
     <div class="brandmark">
@@ -369,7 +405,6 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 <section id="scr-teacher" class="hide">
   <nav class="tnav" id="tnav">
     <button data-t="marks" aria-selected="true">Assess</button>
-    <button data-t="awards" aria-selected="false">Rewards</button>
     <button data-t="programme" aria-selected="false">Programme</button>
     <button data-t="grids" aria-selected="false">Grids</button>
     <button data-t="setup" aria-selected="false">Setup</button>
@@ -382,8 +417,11 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
       <label class="field"><span>Class</span><select id="mClass"></select></label>
       <label class="field"><span>Sport</span><select id="mSport"></select></label>
       <button class="btn sm" id="btnPrintClass">Print overview</button>
-      <button class="btn sm" id="btnExportMarks">Export CSV</button>
+      <button class="btn sm" id="btnExportMarks">Export marks CSV</button>
+      <button class="btn sm" id="btnExportAwards">Export points CSV</button>
+      <button class="btn primary sm" id="btnIssue">Issue points to class</button>
     </div>
+    <div id="awardMsg"></div>
     <div class="printhead"><h2 id="mPrintTitle"></h2><span class="mono small" id="mPrintDate"></span></div>
     <div class="card" style="padding:12px">
       <div class="tablewrap" id="marksTable"></div>
@@ -391,22 +429,6 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <b>self</b> = what the student put. <b>mine</b> = your mark. <b>Progress</b> = levels gained between your Test 1 and your Final Test.
         <b>Gap</b> = how far the student's Final Test self-assessment sits from your Final Test mark, per skill.
       </p>
-    </div>
-  </div>
-
-  <!-- awards -->
-  <div id="t-awards" class="hide">
-    <p class="muted small noprint" style="margin:0 0 12px">House points come from the <b>Final Test</b> only. Test 1 is the starting point, and improving between the two earns a bonus.</p>
-    <div class="toolbar">
-      <label class="field"><span>Class</span><select id="aClass"></select></label>
-      <label class="field"><span>Sport</span><select id="aSport"></select></label>
-      <button class="btn sm" id="btnExportAwards">Export CSV</button>
-      <button class="btn primary sm" id="btnIssue">Issue points to class</button>
-    </div>
-    <div id="awardMsg"></div>
-    <div class="card" style="padding:12px; margin-top:12px">
-      <div class="tablewrap" id="awardTable"></div>
-      <p class="tiny muted" style="margin:10px 0 0" id="awardRule"></p>
     </div>
   </div>
 
@@ -622,6 +644,40 @@ const store = {
 const LEVEL_NAME = ['', 'Needs work', 'Developing', 'Proficient', 'Advanced'];
 const T = { settings:'aa_settings', students:'aa_students', classes:'aa_classes', access:'aa_access', memberships:'aa_memberships', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', marks:'aa_marks', awards:'aa_awards' };
 
+
+/* ---------- global busy indicator ---------- */
+let busyCount = 0, busyBarTimer = null;
+function beginBusy(){
+  busyCount++;
+  clearTimeout(busyBarTimer);
+  document.body.classList.remove('busy-net'); void $('#busybar').offsetWidth; // restart the CSS transition
+  document.body.classList.add('busy-net');
+  $('#busybar').classList.remove('done');
+}
+function endBusy(){
+  busyCount = Math.max(0, busyCount - 1);
+  if (busyCount) return;
+  $('#busybar').classList.add('done');
+  busyBarTimer = setTimeout(() => { document.body.classList.remove('busy-net'); $('#busybar').classList.remove('done'); }, 250);
+}
+function wireBusyButtons(){
+  $$('.btn').forEach(b => {
+    if (b._busyWired || typeof b.onclick !== 'function') return;
+    b._busyWired = true;
+    const orig = b.onclick;
+    b.onclick = function(e){
+      const r = orig.call(this, e);
+      if (r && typeof r.then === 'function'){
+        const html = b.innerHTML;
+        b.disabled = true; b.classList.add('busy');
+        r.finally(() => { b.disabled = false; b.classList.remove('busy'); if (b.innerHTML === html) {/* untouched */} else b.innerHTML = html; });
+      }
+      return r;
+    };
+  });
+}
+new MutationObserver(() => wireBusyButtons()).observe(document.body, { childList:true, subtree:true });
+
 /* ============================================================
    DATA LAYER — same API for Supabase and for demo mode
    ============================================================ */
@@ -644,6 +700,8 @@ const DB = {
   _ls(t){ try { return JSON.parse(store.get('aa::'+t) || '[]'); } catch { return []; } },
   _save(t, rows){ store.set('aa::'+t, JSON.stringify(rows)); },
   async select(table, match, cols){
+    beginBusy();
+    try {
     if (this.mode === 'supabase'){
       let q = this.sb.from(table).select(cols || '*');
       if (match) for (const k in match){ q = Array.isArray(match[k]) ? q.in(k, match[k]) : q.eq(k, match[k]); }
@@ -658,10 +716,13 @@ const DB = {
     let rows = this._ls(table);
     if (match) rows = rows.filter(r => Object.keys(match).every(k => Array.isArray(match[k]) ? match[k].includes(r[k]) : r[k] === match[k]));
     return JSON.parse(JSON.stringify(rows));
+    } finally { endBusy(); }
   },
   async upsert(table, rows, keys){
     rows = Array.isArray(rows) ? rows : [rows];
     if (!rows.length) return [];
+    beginBusy();
+    try {
     if (this.mode === 'supabase'){
       const opts = keys && keys.length ? { onConflict: keys.join(',') } : undefined;
       const { data, error } = await this.sb.from(table).upsert(rows, opts).select();
@@ -678,8 +739,11 @@ const DB = {
     }
     this._save(table, all);
     return rows;
+    } finally { endBusy(); }
   },
   async update(table, match, patch){
+    beginBusy();
+    try {
     if (this.mode === 'supabase'){
       let q = this.sb.from(table).update(patch);
       for (const k in match) q = q.eq(k, match[k]);
@@ -688,8 +752,11 @@ const DB = {
     const all = this._ls(table);
     all.forEach((r, i) => { if (Object.keys(match).every(k => r[k] === match[k])) all[i] = { ...r, ...patch }; });
     this._save(table, all);
+    } finally { endBusy(); }
   },
   async remove(table, match){
+    beginBusy();
+    try {
     if (this.mode === 'supabase'){
       let q = this.sb.from(table).delete();
       const keys = Object.keys(match || {});
@@ -699,6 +766,7 @@ const DB = {
     }
     const keep = this._ls(table).filter(r => !Object.keys(match).every(k => r[k] === match[k]));
     this._save(table, keep);
+    } finally { endBusy(); }
   }
 };
 
@@ -1417,23 +1485,22 @@ function firstRun(){
 }
 function switchTab(t){
   $$('#tnav button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
-  ['marks','awards','programme','grids','setup'].forEach(k => $('#t-'+k).classList.toggle('hide', k !== t));
+  ['marks','programme','grids','setup'].forEach(k => $('#t-'+k).classList.toggle('hide', k !== t));
   if (t === 'marks' && firstRun()) return;
-  ({ marks:renderMarks, awards:renderAwards, grids:renderGridEditor, programme:renderProgramme, setup:renderSetup }[t])();
+  ({ marks:renderMarks, grids:renderGridEditor, programme:renderProgramme, setup:renderSetup }[t])();
 }
 function fillClassSelects(){
   const classes = uniq([...S.classes.map(c => c.class_name), ...S.students.map(s => s.class_name)]).filter(Boolean).sort();
-  ['#mClass','#aClass','#stClass'].forEach(sel => {
+  ['#mClass','#stClass'].forEach(sel => {
     const cur = $(sel).value;
     $(sel).innerHTML = classes.map(c => `<option>${esc(c)}</option>`).join('');
     if (classes.includes(cur)) $(sel).value = cur;
   });
-  ['#mClass','#aClass'].forEach(sel => $(sel).onchange = () => { fillSportSelect(sel, sel.replace('Class','Sport')); rerender(); });
+  $('#mClass').onchange = () => { fillSportSelect('#mClass','#mSport'); renderMarks(); };
   $('#stClass').onchange = renderStudents;
-  ['#mSport','#aSport'].forEach(sel => $(sel).onchange = rerender);
-  fillSportSelect('#mClass','#mSport'); fillSportSelect('#aClass','#aSport');
+  $('#mSport').onchange = renderMarks;
+  fillSportSelect('#mClass','#mSport');
 }
-function rerender(){ const t = $('#tnav button[aria-selected="true"]').dataset.t; ({ marks:renderMarks, awards:renderAwards }[t] || (()=>{}))(); }
 function fillSportSelect(clsSel, sportSel){
   const cls = $(clsSel).value;
   const yr = (S.students.find(s => s.class_name === cls) || {}).year_group
@@ -1452,7 +1519,10 @@ function classStudents(cls){
 let marksPhase = 'overview';
 async function renderMarks(){
   const cls = $('#mClass').value, sport = $('#mSport').value;
-  await loadMarks((gridFor(sport, (S.students.find(x => x.class_name === cls)||{}).year_group)||{}).id, classStudents(cls).map(k => k.id));
+  const gid = (gridFor(sport, (S.students.find(x => x.class_name === cls)||{}).year_group)||{}).id;
+  const ids = classStudents(cls).map(k => k.id);
+  await loadMarks(gid, ids);
+  await loadAwards(gid, ids);
   const g = gridFor(sport, (S.students.find(s => s.class_name === cls) || {}).year_group);
   $('#mPrintTitle').textContent = `${sport} — ${cls}`;
   $('#mPrintDate').textContent = new Date().toLocaleDateString();
@@ -1466,36 +1536,45 @@ async function renderMarks(){
   let table;
   if (marksPhase === 'overview'){
     const tot = (sid, ph) => { const v = sk.map(s => (markOf(sid, g.id, ph, s.idx)||{}).level).filter(Boolean); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
+    const issued = a => S.awards.find(x => x.student_id === a && x.grid_id === g.id);
     table = `<table><thead><tr><th rowspan="2">Student</th><th rowspan="2">House</th>
       <th class="num" colspan="2">Test 1</th><th class="num" colspan="2">Final Test</th>
-      <th class="num" rowspan="2">Progress</th><th class="num" rowspan="2">Gap</th><th class="num" rowspan="2">Points</th></tr>
+      <th class="num" rowspan="2">Progress</th><th class="num" rowspan="2">Gap</th>
+      <th class="num" rowspan="2">House pts</th><th class="num" rowspan="2">Well Done</th></tr>
       <tr><th class="num">self</th><th class="num">mine</th><th class="num">self</th><th class="num">mine</th></tr></thead><tbody>
       ${kids.map(k => {
         const gap = sk.map(s => { const a = (markOf(k.id,g.id,'self2',s.idx)||{}).level, b = (markOf(k.id,g.id,'t3',s.idx)||{}).level; return (a&&b) ? Math.abs(a-b) : null; }).filter(x => x !== null);
         const gv = gap.length ? (gap.reduce((a,b)=>a+b,0)/gap.length) : null;
         const gc = gv === null ? '' : gv <= 0.5 ? 'gap0' : gv <= 1 ? 'gap1' : 'gap2';
-        const pts = sk.map(s => (markOf(k.id,g.id,'t3',s.idx)||{}).level).filter(Boolean).reduce((n,l) => n + lvlPoints(l), 0);
         const cell = v => `<td class="num">${v ?? '·'}</td>`;
         const a = tot(k.id,'t1'), b = tot(k.id,'t3');
         const prog = (a !== null && b !== null) ? b - a : null;
+        const award = computeAward(k, g, sk), done = issued(k.id);
+        const hp = done ? done.hp : award.hp, wd = done ? done.wd : null;
         return `<tr><td class="namecell">${esc(k.full_name)}</td>
           <td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
           ${cell(tot(k.id,'self1'))}${cell(a)}${cell(tot(k.id,'self2'))}${cell(b)}
           <td class="num ${prog > 0 ? 'gap0' : ''}">${prog === null ? '·' : (prog > 0 ? '+' + prog : prog)}</td>
           <td class="num ${gc}">${gv === null ? '·' : gv.toFixed(1)}</td>
-          <td class="num">${pts || '·'}</td></tr>`;
+          <td class="num"><span class="pill hp">${hp || 0}</span></td>
+          <td class="num">${wd === null ? '<span class="tiny muted">not issued</span>' : `<span class="pill wd">${wd}</span>`}</td></tr>`;
       }).join('')}</tbody></table>`;
   } else {
     const ph = marksPhase;
     const avg = i => { const v = kids.map(k => (markOf(k.id,g.id,ph,i)||{}).level).filter(Boolean); return v.length ? (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1) : '·'; };
-    table = `<table><thead><tr><th>Student</th>
+    table = `<table><thead>
+      <tr><th rowspan="2">Student</th>
       ${sk.map(s => `<th class="num" title="${esc(s.name)}">${s.idx}. ${esc(s.name.length > 18 ? s.name.slice(0,17)+'…' : s.name)}</th>`).join('')}
-      <th class="num">Total</th></tr></thead><tbody>
+      <th class="num" rowspan="2">Total</th></tr>
+      <tr>${sk.map(s => `<th class="num setall" data-idx="${s.idx}"><span class="tiny muted">Set all</span>
+        <span class="btnrow" style="justify-content:center; gap:3px">${[1,2,3,4].map(l => `<button type="button" class="setallbtn lv${l}" data-l="${l}">${l}</button>`).join('')}</span></th>`).join('')}
+      </tr></thead><tbody>
       ${kids.map(k => {
         const cells = sk.map(s => {
           const v = (markOf(k.id, g.id, ph, s.idx)||{}).level || '';
-          return `<td class="num"><select class="lvl" data-v="${v}" data-sid="${k.id}" data-idx="${s.idx}">
-            <option value="">·</option>${[1,2,3,4].map(l => `<option value="${l}" ${v==l?'selected':''}>${l}</option>`).join('')}</select></td>`;
+          return `<td class="num"><div class="lvlpick" data-sid="${k.id}" data-idx="${s.idx}">
+            ${[1,2,3,4].map(l => `<button type="button" class="lvlbtn lv${l}" data-l="${l}" aria-pressed="${v==l}">${l}</button>`).join('')}
+          </div></td>`;
         }).join('');
         const tt = sk.map(s => (markOf(k.id,g.id,ph,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
         return `<tr><td class="namecell">${esc(k.full_name)}</td>${cells}<td class="num">${tt||'·'}</td></tr>`;
@@ -1518,16 +1597,32 @@ async function renderMarks(){
     renderMarks();
   };
   $$('#marksTable .tabs button').forEach(b => b.onclick = () => { marksPhase = b.dataset.p; renderMarks(); });
-  $$('#marksTable select.lvl').forEach(sel => sel.onchange = async () => {
-    const sid = +sel.dataset.sid, idx = +sel.dataset.idx, lvl = sel.value ? +sel.value : null;
-    sel.dataset.v = sel.value;
-    const ex = markOf(sid, g.id, marksPhase, idx);
-    if (lvl === null){ if (ex) await DB.remove(T.marks, { id: ex.id }); }
-    else await DB.upsert(T.marks, [{ ...(ex ? { id: ex.id } : {}), student_id: sid, grid_id: g.id, phase: marksPhase, skill_idx: idx, level: lvl }], ['student_id','grid_id','phase','skill_idx']);
-    await loadMarks(g.id, classStudents($('#mClass').value).map(k => k.id));
-    const row = sel.closest('tr'), tds = row.querySelectorAll('td');
-    const tt = skillsOf(g.id).map(s => (markOf(sid,g.id,marksPhase,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
-    tds[tds.length-1].textContent = tt || '·';
+  $$('#marksTable .lvlpick').forEach(group => {
+    const sid = +group.dataset.sid, idx = +group.dataset.idx;
+    group.querySelectorAll('.lvlbtn').forEach(btn => btn.onclick = async () => {
+      const already = btn.getAttribute('aria-pressed') === 'true';
+      const lvl = already ? null : +btn.dataset.l;
+      group.querySelectorAll('.lvlbtn').forEach(b => b.setAttribute('aria-pressed', String(!already && b === btn)));
+      const ex = markOf(sid, g.id, marksPhase, idx);
+      if (lvl === null){ if (ex) await DB.remove(T.marks, { id: ex.id }); }
+      else await DB.upsert(T.marks, [{ ...(ex ? { id: ex.id } : {}), student_id: sid, grid_id: g.id, phase: marksPhase, skill_idx: idx, level: lvl }], ['student_id','grid_id','phase','skill_idx']);
+      await loadMarks(g.id, classStudents($('#mClass').value).map(k => k.id));
+      const row = group.closest('tr'), tds = row.querySelectorAll('td');
+      const tt = skillsOf(g.id).map(s => (markOf(sid,g.id,marksPhase,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
+      tds[tds.length-1].textContent = tt || '·';
+    });
+  });
+  $$('#marksTable .setallbtn').forEach(btn => btn.onclick = async () => {
+    const idx = +btn.closest('.setall').dataset.idx, lvl = +btn.dataset.l;
+    const cls = $('#mClass').value, kidsNow = classStudents(cls);
+    if (!confirm(`Set every student in ${cls} to level ${lvl} for skill ${idx}? You can still adjust anyone by hand afterwards.`)) return;
+    const rows = kidsNow.map(k => {
+      const ex = markOf(k.id, g.id, marksPhase, idx);
+      return { ...(ex ? { id: ex.id } : {}), student_id: k.id, grid_id: g.id, phase: marksPhase, skill_idx: idx, level: lvl };
+    });
+    await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
+    await loadMarks(g.id, kidsNow.map(k => k.id));
+    renderMarks();
   });
 }
 $('#btnPrintClass').onclick = () => window.print();
@@ -1555,33 +1650,8 @@ function computeAward(k, g, sk){
   const honB = (diffs.every(d => d !== null && d <= 1)) ? S.settings.honesty : 0;
   return { base, selfB, progB, honB, hp: base + selfB + progB + honB };
 }
-async function renderAwards(){
-  const cls = $('#aClass').value, sport = $('#aSport').value;
-  const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group);
-  const ids = classStudents(cls).map(k => k.id);
-  await loadMarks((g||{}).id, ids); await loadAwards((g||{}).id, ids);
-  $('#awardRule').textContent = `Your Final Test mark pays: level 1 = ${S.settings.l1}, level 2 = ${S.settings.l2}, level 3 = ${S.settings.l3}, level 4 = ${S.settings.l4}. Bonuses: ${S.settings.selfBonus} for each self-assessment completed, ${S.settings.progBonus} per level gained between your Test 1 and Final Test marks, ${S.settings.honesty} when every self-mark lands within one level of yours. ${S.settings.hpPerWd} house points = 1 Well Done point; the remainder carries to the next sport.`;
-  if (!g){ $('#awardTable').innerHTML = '<p class="muted">No grid for this sport yet.</p>'; return; }
-  const sk = skillsOf(g.id), kids = classStudents(cls);
-  const issued = a => S.awards.find(x => x.student_id === a && x.grid_id === g.id);
-  $('#awardTable').innerHTML = `<table><thead><tr>
-    <th>Student</th><th>House</th><th class="num">Final Test</th><th class="num">Self</th><th class="num">Progress</th><th class="num">Honesty</th>
-    <th class="num">House pts</th><th class="num">Carry in</th><th class="num">Well Done</th><th class="num">Carry out</th><th>Status</th></tr></thead><tbody>
-    ${kids.map(k => {
-      const done = issued(k.id);
-      const a = computeAward(k, g, sk);
-      const carry = done ? (done.carry_in || 0) : (k.wd_carry || 0), tot = carry + a.hp;
-      const wd = Math.floor(tot / S.settings.hpPerWd), out = tot % S.settings.hpPerWd;
-      return `<tr><td class="namecell">${esc(k.full_name)}</td>
-        <td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
-        <td class="num">${a.base}</td><td class="num">${a.selfB}</td><td class="num">${a.progB}</td><td class="num">${a.honB}</td>
-        <td class="num"><span class="pill hp">${a.hp}</span></td><td class="num">${carry}</td>
-        <td class="num"><span class="pill wd">${wd}</span></td><td class="num">${out}</td>
-        <td class="tiny">${done ? 'Issued' : 'Not issued'}</td></tr>`;
-    }).join('')}</tbody></table>`;
-}
 $('#btnIssue').onclick = async () => {
-  const cls = $('#aClass').value, sport = $('#aSport').value;
+  const cls = $('#mClass').value, sport = $('#mSport').value;
   const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group); if (!g) return;
   if (!confirm(`Issue house points to ${cls} for ${sport}? Re-issuing replaces the previous total for this sport.`)) return;
   const sk = skillsOf(g.id);
@@ -1593,12 +1663,13 @@ $('#btnIssue').onclick = async () => {
     await DB.upsert(T.awards, [{ ...(prev ? { id: prev.id } : {}), student_id: k.id, grid_id: g.id, hp: a.hp, wd, carry_in: carry, carry_out: out, issued_at: new Date().toISOString() }], ['student_id','grid_id']);
     await DB.update(T.students, { id: k.id }, { wd_carry: out });
   }
-  await loadAwards(g.id, classStudents(cls).map(k => k.id));
+  const ids = classStudents(cls).map(k => k.id);
+  await loadAwards(g.id, ids);
   S.students = await DB.select(T.students, null, '*');
-  renderAwards(); msg('#awardMsg', 'Points issued. Export the CSV to enter the Well Done points on the school site.', 'ok');
+  renderMarks(); msg('#awardMsg', 'Points issued. Export the CSV to enter the Well Done points on the school site.', 'ok');
 };
 $('#btnExportAwards').onclick = () => {
-  const cls = $('#aClass').value, sport = $('#aSport').value;
+  const cls = $('#mClass').value, sport = $('#mSport').value;
   const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group); if (!g) return;
   const sk = skillsOf(g.id);
   const rows = classStudents(cls).map(k => {
@@ -1792,6 +1863,7 @@ async function pdfPages(file){
 $('#filePdf').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   msg('#pdfMsg', 'Reading the PDF…', 'info');
+  beginBusy();
   try {
     const pg = await pdfPages(f);
     const sport = sportFromTitle(pg[0]);
@@ -1799,6 +1871,7 @@ $('#filePdf').onchange = async e => {
     const n = parseGridPage(pg[0]).length;
     msg('#pdfMsg', `Found ${n} skills${pg[1] ? ' and a technical expectations page' : ''}. Check the sport name, then Import.`, 'ok');
   } catch (err){ msg('#pdfMsg', err.message, 'err'); }
+  finally { endBusy(); }
 };
 $('#btnImportPdf').onclick = async () => {
   const f = $('#filePdf').files[0];
@@ -2122,6 +2195,7 @@ let rosterDraft = [];
 $('#fileRoster').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   msg('#rosterMsg', 'Reading the file…', 'info'); $('#rosterPreview').innerHTML = '';
+  beginBusy();
   try {
     const sheets = await readRoster(f, $('#rosterClass').value);
     const total = sheets.reduce((n,sh) => n + sh.rows.length, 0);
@@ -2132,6 +2206,7 @@ $('#fileRoster').onchange = async e => {
       </tbody></table></div>`;
     msg('#rosterMsg', `${total} students across ${sheets.length} class${sheets.length===1?'':'es'}. Check the classes above, then Import.`, 'ok');
   } catch (err){ msg('#rosterMsg', err.message, 'err'); rosterDraft = []; }
+  finally { endBusy(); }
 };
 $('#btnImportRoster').onclick = async () => {
   if (!rosterDraft.length) return msg('#rosterMsg', 'Choose a file first.', 'err');
@@ -2258,6 +2333,7 @@ $('#btnDelClassStudents').onclick = async () => {
   await DB.remove(T.students, { class_name: cls });
   await DB.remove(T.memberships, { class_name: cls });
   await refreshAfterWipe();
+  rosterDraft = []; if ($('#fileRoster')) $('#fileRoster').value = '';
   msg('#studentMsg', `${cls} is now empty.`, 'ok');
 };
 
@@ -2268,6 +2344,7 @@ $('#btnDelAllClasses').onclick = async () => {
   for (const c of S.classes) await wipeClass(c.class_name);
   for (const c of S.classes) await DB.remove(T.classes, { class_name: c.class_name });
   await refreshAfterWipe();
+  rosterDraft = []; if ($('#fileRoster')) $('#fileRoster').value = '';
   msg('#dangerMsg', 'Every class and student has been removed.', 'ok');
 };
 
@@ -2278,6 +2355,7 @@ $('#btnDelAllStudents').onclick = async () => {
   await DB.remove(T.students, {});
   await DB.remove(T.memberships, {});
   await refreshAfterWipe();
+  rosterDraft = []; if ($('#fileRoster')) $('#fileRoster').value = '';
   msg('#dangerMsg', 'Every student has been removed. Classes and codes are unchanged.', 'ok');
 };
 
@@ -2287,6 +2365,7 @@ $('#btnDelEverything').onclick = async () => {
   for (const c of S.classes) await DB.remove(T.classes, { class_name: c.class_name });
   await DB.upsert(T.settings, [{ id:1, data: DEFAULT_SETTINGS }], ['id']);
   await loadCore();
+  rosterDraft = []; if ($('#fileRoster')) $('#fileRoster').value = '';
   fillClassSelects(); renderClasses(); renderStudents(); fillGridSelect(); renderGridEditor(); renderProgramme(); renderSettings();
   msg('#dangerMsg', 'Everything has been reset. Start again from Grids \u2192 Load standard sports.', 'ok');
 };
