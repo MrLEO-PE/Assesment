@@ -216,6 +216,7 @@ select.lvl[data-v="4"]{background:var(--l4); color:#fff}
 .gap1{color:var(--muted)}
 .gap2{color:var(--warn); font-weight:600}
 .house-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.house-pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:.72rem; font-weight:700; color:#fff; white-space:nowrap}
 
 /* ---------- teacher nav ---------- */
 .tnav{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px}
@@ -274,6 +275,12 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
 .note{margin-bottom:14px}
 .note h3{font-size:.95rem; margin-bottom:3px}
 .note p{margin:0; font-size:.9rem; color:#3D474F}
+.scorepair{ display:flex; align-items:center; gap:8px }
+.scoreitem{ display:flex; flex-direction:column; align-items:center; gap:2px }
+.wholabel{ font-family:var(--mono); font-size:.6rem; font-weight:700; letter-spacing:.04em }
+.wholabel.you{ color:var(--brand-2) }
+.wholabel.teacher{ color:var(--gold) }
+.lvlbadge.teacherbadge{ box-shadow:0 0 0 2px var(--gold) }
 .gaptag{ font-family:var(--mono); font-size:.7rem; padding:2px 6px; border-radius:6px; margin-left:6px }
 .gaptag.gap0{ background:#E9F3ED; color:var(--l4) }
 .gaptag.gap1{ background:#F7EFDD; color:var(--gold) }
@@ -391,6 +398,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
   <h1 id="sHomeTitle">Your sports</h1>
   <p class="muted small" style="margin-top:4px" id="sHomeSub"></p>
   <div class="kpi" id="sKpi"></div>
+  <div id="leaderboard"></div>
   <div id="sportList"></div>
 </section>
 
@@ -435,6 +443,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
       <button class="btn primary sm" id="btnIssue">Issue points to class</button>
     </div>
     <div id="awardMsg"></div>
+    <div id="houseBoard" style="margin-top:12px"></div>
     <div class="printhead"><h2 id="mPrintTitle"></h2><span class="mono small" id="mPrintDate"></span></div>
     <div class="card" style="padding:12px">
       <div class="tablewrap" id="marksTable"></div>
@@ -675,6 +684,9 @@ function endBusy(){
   busyBarTimer = setTimeout(() => { document.body.classList.remove('busy-net'); $('#busybar').classList.remove('done'); }, 250);
 }
 function wireBusyButtons(){
+  // Disables the button and dims it while its click handler's promise is
+  // pending. Never touches the button's text/innerHTML \u2014 a handler is
+  // free to set its own "Copied!" / "Saved" message and time it out itself.
   $$('.btn').forEach(b => {
     if (b._busyWired || typeof b.onclick !== 'function') return;
     b._busyWired = true;
@@ -682,9 +694,8 @@ function wireBusyButtons(){
     b.onclick = function(e){
       const r = orig.call(this, e);
       if (r && typeof r.then === 'function'){
-        const html = b.innerHTML;
         b.disabled = true; b.classList.add('busy');
-        r.finally(() => { b.disabled = false; b.classList.remove('busy'); if (b.innerHTML === html) {/* untouched */} else b.innerHTML = html; });
+        r.finally(() => { b.disabled = false; b.classList.remove('busy'); });
       }
       return r;
     };
@@ -1351,8 +1362,39 @@ function progFor(cls, year){
 /* ============================================================
    STUDENT — home
    ============================================================ */
+
+async function loadLeaderboard(){
+  const cls = S.user.class_name, term = S.settings.currentTerm || '';
+  if (DB.mode === 'supabase'){
+    const { data, error } = await DB.sb.rpc('aa_leaderboard', { p_class: cls, p_code: L.code || '', p_term: term });
+    return error ? [] : data;
+  }
+  const students = classStudents(cls);
+  const allAwards = DB._ls(T.awards);
+  return students.map(s => ({
+    id: s.id, full_name: s.full_name,
+    hp_term: allAwards.filter(a => a.student_id === s.id && (a.term||'') === term).reduce((n,a) => n + (a.hp||0), 0),
+    hp_year: allAwards.filter(a => a.student_id === s.id).reduce((n,a) => n + (a.hp||0), 0)
+  })).sort((a,b) => b.hp_year - a.hp_year || b.hp_term - a.hp_term);
+}
+async function renderLeaderboard(){
+  const rows = await loadLeaderboard();
+  if (!rows.length){ $('#leaderboard').innerHTML = ''; return; }
+  const idx = rows.findIndex(r => r.id === S.user.id);
+  const me = idx >= 0 ? rows[idx] : null;
+  $('#leaderboard').innerHTML = `<div class="card pad" style="margin-bottom:16px">
+    <span class="eyebrow">Your class</span>
+    ${me ? `<div class="cmp"><span>Your rank</span><span>#${idx+1} of ${rows.length}</span></div>
+      <div class="cmp"><span>House points this term</span><span class="pill hp">${me.hp_term}</span></div>
+      <div class="cmp"><span>House points all year</span><span class="pill hp">${me.hp_year}</span></div>` : ''}
+    <div style="border-top:1px solid var(--line); margin-top:10px; padding-top:8px">
+      ${rows.slice(0,5).map((r,i) => `<div class="cmp ${r.id===S.user.id?'gap0':''}"><span>${i+1}. ${esc(r.full_name)}</span><span class="mono">${r.hp_year}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
 function renderStudentHome(){
   $('#sHomeTitle').textContent = `Hi ${S.user.full_name.split(' ')[0]}`;
+  renderLeaderboard();
   $('#sHomeSub').textContent = `Year ${S.user.year_group} · ${S.user.class_name} · ${S.user.house}`;
   const mine = S.awards.filter(a => a.student_id === S.user.id);
   const hp = mine.reduce((n,a) => n + (a.hp||0), 0), wd = mine.reduce((n,a) => n + (a.wd||0), 0);
@@ -1451,8 +1493,11 @@ function renderLadders(){
   const gapRows = pairs => pairs.filter(x => x.a && x.b).map(x => {
     const d = Math.abs(x.a - x.b), cls = d === 0 ? 'gap0' : d === 1 ? 'gap1' : 'gap2';
     return `<div class="cmp"><span>${esc(x.k.name)}</span>
-      <span><span class="lvlbadge lv${x.a}">${x.a}</span><span class="tiny muted" style="margin:0 5px">vs</span><span class="lvlbadge lv${x.b}">${x.b}</span>
-      <span class="gaptag ${cls}">${d === 0 ? 'match' : d + ' off'}</span></span></div>`;
+      <span class="scorepair">
+        <span class="scoreitem"><span class="wholabel you">YOU</span><span class="lvlbadge lv${x.a}">${x.a}</span></span>
+        <span class="scoreitem"><span class="wholabel teacher">TEACHER</span><span class="lvlbadge lv${x.b} teacherbadge">${x.b}</span></span>
+        <span class="gaptag ${cls}">${d === 0 ? 'match' : d + ' off'}</span>
+      </span></div>`;
   }).join('');
   const avgGap = pairs => { const v = pairs.filter(x => x.a && x.b).map(x => Math.abs(x.a-x.b)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
   const g1 = avgGap(s1t1), g2 = avgGap(s2t3);
@@ -1560,12 +1605,46 @@ function classStudents(cls){
 
 /* ---------- class marks ---------- */
 let marksPhase = 'overview';
+async function ensureAllAwards(){
+  S.allAwards = await DB.select(T.awards);
+}
+function houseTotals(students){
+  const houses = uniq(S.students.map(s => s.house)).filter(Boolean).sort();
+  const ids = new Set(students.map(s => s.id));
+  const totals = {}; houses.forEach(h => totals[h] = 0);
+  (S.allAwards || []).forEach(a => {
+    if (!ids.has(a.student_id)) return;
+    const st = S.students.find(s => s.id === a.student_id);
+    if (st && st.house) totals[st.house] = (totals[st.house] || 0) + (a.hp || 0);
+  });
+  return { houses, totals };
+}
+function renderHouseBoard(cls){
+  const houses = uniq(S.students.map(s => s.house)).filter(Boolean).sort();
+  if (!houses.length){ $('#houseBoard').innerHTML = ''; return; }
+  const year = (S.students.find(s => s.class_name === cls) || {}).year_group;
+  const rows = [
+    ['Selected class', classStudents(cls)],
+    ['Year group', S.students.filter(s => +s.year_group === +year)],
+    ['Whole school', S.students],
+  ];
+  $('#houseBoard').innerHTML = `<div class="tablewrap"><table><thead><tr><th>House points</th>
+    ${houses.map(h => `<th class="num"><span class="house-pill" style="background:${HOUSE_COLOR(h)}">${esc(h)}</span></th>`).join('')}
+    </tr></thead><tbody>
+    ${rows.map(([label, students]) => {
+      const { totals } = houseTotals(students);
+      return `<tr><td class="namecell">${label}</td>${houses.map(h => `<td class="num">${totals[h] || 0}</td>`).join('')}</tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+}
 async function renderMarks(){
   const cls = $('#mClass').value, sport = $('#mSport').value;
   const gid = (gridFor(sport, (S.students.find(x => x.class_name === cls)||{}).year_group)||{}).id;
   const ids = classStudents(cls).map(k => k.id);
   await loadMarks(gid, ids);
   await loadAwards(gid, ids);
+  await ensureAllAwards();
+  renderHouseBoard(cls);
   const g = gridFor(sport, (S.students.find(s => s.class_name === cls) || {}).year_group);
   $('#mPrintTitle').textContent = `${sport} — ${cls}`;
   $('#mPrintDate').textContent = new Date().toLocaleDateString();
@@ -1595,7 +1674,7 @@ async function renderMarks(){
         const award = computeAward(k, g, sk), done = issued(k.id);
         const hp = done ? done.hp : award.hp, wd = done ? done.wd : null;
         return `<tr><td class="namecell">${esc(k.full_name)}</td>
-          <td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
+          <td class="tiny">${k.house ? `<span class="house-pill" style="background:${HOUSE_COLOR(k.house)}">${esc(k.house)}</span>` : ''}</td>
           ${cell(tot(k.id,'self1'))}${cell(a)}${cell(tot(k.id,'self2'))}${cell(b)}
           <td class="num ${prog > 0 ? 'gap0' : ''}">${prog === null ? '·' : (prog > 0 ? '+' + prog : prog)}</td>
           <td class="num ${gc}">${gv === null ? '·' : gv.toFixed(1)}</td>
@@ -1712,7 +1791,7 @@ $('#btnIssue').onclick = async () => {
     const carry = prev ? (prev.carry_in || 0) : (k.wd_carry || 0);
     const a = computeAward(k, g, sk), tot = carry + a.hp;
     const wd = Math.floor(tot / S.settings.hpPerWd), out = tot % S.settings.hpPerWd;
-    await DB.upsert(T.awards, [{ ...(prev ? { id: prev.id } : {}), student_id: k.id, grid_id: g.id, hp: a.hp, wd, carry_in: carry, carry_out: out, issued_at: new Date().toISOString() }], ['student_id','grid_id']);
+    await DB.upsert(T.awards, [{ ...(prev ? { id: prev.id } : {}), student_id: k.id, grid_id: g.id, hp: a.hp, wd, carry_in: carry, carry_out: out, term: S.settings.currentTerm || '', issued_at: new Date().toISOString() }], ['student_id','grid_id']);
     await DB.update(T.students, { id: k.id }, { wd_carry: out });
   }
   const ids = classStudents(cls).map(k => k.id);
@@ -2064,7 +2143,7 @@ function renderStudents(){
   const cls = $('#stClass').value;
   $('#studentTable').innerHTML = `<table><thead><tr><th>Name</th><th class="num">Year</th><th>House</th><th class="num">PIN</th><th class="num">Carry</th><th class="noprint"></th></tr></thead><tbody>
     ${classStudents(cls).map(k => `<tr><td class="namecell">${esc(k.full_name)}</td>
-      <td class="num">${k.year_group}</td><td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
+      <td class="num">${k.year_group}</td><td class="tiny">${k.house ? `<span class="house-pill" style="background:${HOUSE_COLOR(k.house)}">${esc(k.house)}</span>` : ''}</td>
       <td class="num mono">${k.pin ? esc(k.pin) : '<span class="muted">not set</span>'}</td><td class="num">${k.wd_carry||0}</td>
       <td class="noprint"><button class="btn sm danger" data-rm="${k.id}">Remove</button></td></tr>`).join('')}
     </tbody></table>`;
