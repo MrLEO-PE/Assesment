@@ -1117,7 +1117,10 @@ async function loadCore(){
     canList ? DB.select(T.memberships) : Promise.resolve([]),
     DB.select(T.programme),
     DB.select(T.grids), DB.select(T.skills),
-    (S.role === 'teacher' || !S.user) ? Promise.resolve([]) : DB.select(T.awards, { student_id: S.user.id })
+    // Students cannot read aa_awards directly (locked down for the leaderboard);
+    // their totals arrive via the aa_leaderboard function instead. Demo mode has
+    // no such restriction, so it can still read the table.
+    (DB.mode === 'demo' && S.user && S.role !== 'teacher') ? DB.select(T.awards, { student_id: S.user.id }) : Promise.resolve([])
   ]);
   S.settings = { ...DEFAULT_SETTINGS, ...((settings[0] && settings[0].data) || {}) };
   S.students = students; S.classes = classes; S.access = access; S.memberships = memberships; S.programme = programme; S.grids = grids;
@@ -1406,6 +1409,7 @@ async function renderLeaderboard(){
   if (!rows.length){ $('#leaderboard').innerHTML = ''; return; }
   const idx = rows.findIndex(r => r.id === S.user.id);
   const me = idx >= 0 ? rows[idx] : null;
+  if (me){ S.myTotals = me; $('#sKpi') && renderStudentKpi(); }
   $('#leaderboard').innerHTML = `<div class="card pad" style="margin-bottom:16px">
     <span class="eyebrow">Your class</span>
     ${me ? `<div class="cmp"><span>Your rank</span><span>#${idx+1} of ${rows.length}</span></div>
@@ -1416,16 +1420,24 @@ async function renderLeaderboard(){
     </div>
   </div>`;
 }
-function renderStudentHome(){
-  $('#sHomeTitle').textContent = `Hi ${S.user.full_name.split(' ')[0]}`;
-  renderLeaderboard();
-  $('#sHomeSub').textContent = `Year ${S.user.year_group} · ${S.user.class_name} · ${S.user.house}`;
+function renderStudentKpi(){
+  if (!$('#sKpi') || !S.user) return;
+  // In live mode students cannot read aa_awards directly, so their totals come
+  // from the leaderboard function (S.myTotals). Demo mode still has S.awards.
   const mine = S.awards.filter(a => a.student_id === S.user.id);
-  const hp = mine.reduce((n,a) => n + (a.hp||0), 0), wd = mine.reduce((n,a) => n + (a.wd||0), 0);
+  const hp = mine.length ? mine.reduce((n,a) => n + (a.hp||0), 0) : (S.myTotals ? S.myTotals.hp_year : 0);
+  const wd = mine.length ? mine.reduce((n,a) => n + (a.wd||0), 0)
+    : Math.floor((S.myTotals ? S.myTotals.hp_year : 0) / (S.settings.hpPerWd || 1));
   $('#sKpi').innerHTML = `
     <div class="card"><div class="eyebrow">House points</div><div class="v" style="color:var(--l4)">${hp}</div></div>
     <div class="card"><div class="eyebrow">Well Done points</div><div class="v" style="color:var(--gold)">${wd}</div></div>
     <div class="card"><div class="eyebrow">Towards next</div><div class="v mono">${(S.user.wd_carry||0)}/${S.settings.hpPerWd}</div></div>`;
+}
+function renderStudentHome(){
+  $('#sHomeTitle').textContent = `Hi ${S.user.full_name.split(' ')[0]}`;
+  renderLeaderboard();
+  $('#sHomeSub').textContent = `Year ${S.user.year_group} · ${S.user.class_name} · ${S.user.house}`;
+  renderStudentKpi();
 
   const list = progFor(S.user.class_name, S.user.year_group);
   if (!list.length){ $('#sportList').innerHTML = `<p class="muted">No sports set for your class yet.</p>`; return; }
