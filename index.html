@@ -524,7 +524,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <label class="field"><span>Put everyone in</span><select id="rosterClass"></select></label>
         <button class="btn primary sm" id="btnImportRoster">Import list</button>
       </div>
-      <p class="tiny muted">Excel, CSV or PDF. If the file has a class column it is used; otherwise everyone goes into the class you pick.</p>
+      <p class="tiny muted">Excel: each sheet tab becomes a class \u2014 name a tab 8MS or 8BCH and that's the class, whatever else is in the sheet. CSV or PDF: uses a class column if there is one, otherwise everyone goes into the class you pick. A student who already exists (same name, same year group) is added to the new class as well, not duplicated.</p>
       <div id="rosterMsg"></div>
       <div id="rosterPreview"></div>
       <hr style="border:0; border-top:1px solid var(--line); margin:16px 0">
@@ -609,7 +609,7 @@ const store = {
   set: (k, v) => { try { LS_OK ? localStorage.setItem(k, v) : (MEM[k] = v); } catch { MEM[k] = v; } }
 };
 const LEVEL_NAME = ['', 'Needs work', 'Developing', 'Proficient', 'Advanced'];
-const T = { settings:'aa_settings', students:'aa_students', classes:'aa_classes', access:'aa_access', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', marks:'aa_marks', awards:'aa_awards' };
+const T = { settings:'aa_settings', students:'aa_students', classes:'aa_classes', access:'aa_access', memberships:'aa_memberships', programme:'aa_programme', grids:'aa_grids', skills:'aa_skills', marks:'aa_marks', awards:'aa_awards' };
 
 /* ============================================================
    DATA LAYER — same API for Supabase and for demo mode
@@ -688,7 +688,7 @@ const DB = {
 /* ---------- app state ---------- */
 const S = {
   settings: null, user: null, role: null,
-  students: [], classes: [], access: [], roster: [], programme: [], grids: [], skills: [], marks: [], awards: [],
+  students: [], classes: [], access: [], memberships: [], roster: [], programme: [], grids: [], skills: [], marks: [], awards: [],
   sport: null, grid: null, phase: 'self1', draft: {}
 };
 const STUDENT_COLS = 'id,code,full_name,class_name,year_group,house,wd_carry';
@@ -977,16 +977,18 @@ function seedDemo(force){
    ============================================================ */
 async function loadCore(){
   const canList = DB.mode === 'demo' || S.role === 'teacher';
-  const [settings, students, classes, access, programme, grids, skills, awards] = await Promise.all([
+  const [settings, students, classes, access, memberships, programme, grids, skills, awards] = await Promise.all([
     DB.select(T.settings),
     canList ? DB.select(T.students, null, '*') : Promise.resolve([]),
     DB.select(T.classes, null, DB.mode === 'demo' || S.role === 'teacher' ? '*' : 'class_name,year_group'),
-    DB.select(T.access), DB.select(T.programme),
+    DB.select(T.access),
+    canList ? DB.select(T.memberships) : Promise.resolve([]),
+    DB.select(T.programme),
     DB.select(T.grids), DB.select(T.skills),
     (S.role === 'teacher' || !S.user) ? Promise.resolve([]) : DB.select(T.awards, { student_id: S.user.id })
   ]);
   S.settings = { ...DEFAULT_SETTINGS, ...((settings[0] && settings[0].data) || {}) };
-  S.students = students; S.classes = classes; S.access = access; S.programme = programme; S.grids = grids;
+  S.students = students; S.classes = classes; S.access = access; S.memberships = memberships; S.programme = programme; S.grids = grids;
   S.skills = skills; S.awards = awards;
 }
 const gridFor = (sport, year) => S.grids.find(g => g.sport === sport && +g.year_group === +year)
@@ -1070,7 +1072,7 @@ async function openRoster(cls, code){
       const c = S.classes.find(x => x.class_name === cls);
       if (c && (c.join_code || '') && (c.join_code || '').toUpperCase() !== code.toUpperCase())
         return msg('#loginMsg', 'That class code is not right.', 'err');
-      S.roster = S.students.filter(s => s.class_name === cls);
+      S.roster = classStudents(cls);
     }
   } catch (e){ return msg('#loginMsg', e.message || 'That class code is not right.', 'err'); }
   $('#loginH').textContent = 'Find your name';
@@ -1423,7 +1425,10 @@ function fillSportSelect(clsSel, sportSel){
   $(sportSel).innerHTML = sports.map(s => `<option>${esc(s)}</option>`).join('') || '<option value="">No sports</option>';
   if (sports.includes(cur)) $(sportSel).value = cur;
 }
-const classStudents = cls => S.students.filter(s => s.class_name === cls).sort((a,b) => a.full_name.localeCompare(b.full_name));
+function classStudents(cls){
+  const ids = new Set(S.memberships.filter(m => m.class_name === cls).map(m => m.student_id));
+  return S.students.filter(s => s.class_name === cls || ids.has(s.id)).sort((a,b) => a.full_name.localeCompare(b.full_name));
+}
 
 /* ---------- class marks ---------- */
 let marksPhase = 'overview';
@@ -1955,7 +1960,7 @@ $('#btnExportStudents').onclick = () => {
 const mkCode = cls => cls.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,3) + '-' +
   Math.random().toString(36).slice(2,5).toUpperCase();
 async function ensureClasses(){
-  const named = uniq(S.students.map(s => s.class_name)).filter(Boolean);
+  const named = uniq([...S.students.map(s => s.class_name), ...S.memberships.map(m => m.class_name)]).filter(Boolean);
   const missing = named.filter(c => !S.classes.some(x => x.class_name === c));
   if (!missing.length) return;
   await DB.upsert(T.classes, missing.map(c => ({
@@ -1972,7 +1977,7 @@ function renderClasses(){
       <td class="namecell">${esc(c.class_name)}</td>
       <td class="num">${c.year_group}</td>
       <td><input class="codein mono" data-code="${esc(c.class_name)}" value="${esc(c.join_code||'')}" placeholder="no code" style="width:120px; padding:5px 7px; border:1px solid var(--line); border-radius:7px; text-transform:uppercase"></td>
-      <td class="num">${S.students.filter(s => s.class_name === c.class_name).length}</td>
+      <td class="num">${classStudents(c.class_name).length}</td>
       <td class="noprint"><button class="btn sm" data-newcode="${esc(c.class_name)}">New code</button></td></tr>`).join('')}
     </tbody></table>`;
   $$('#classTable .codein').forEach(i => i.onchange = async () => {
@@ -2006,16 +2011,17 @@ $('#btnPrintCodes').onclick = () => {
 
 /* ---------- roster import: xlsx, csv or pdf ---------- */
 const HEAD = {
-  first: /^(first ?name|pr[ée]nom|given)/i,
+  first: /^(first ?name|forename|pr[ée]nom|given)/i,
   last:  /^(last ?name|surname|nom de famille|family)/i,
   full:  /^(full ?name|name|student ?name|student|[ée]l[èe]ve|nom complet|nom et pr[ée]nom|nom)$/i,
   cls:   /^(class|classe|group|groupe|division|form)/i,
   year:  /^(year|ann[ée]e|niveau|grade|level)/i,
-  house: /^(house|maison)/i
+  house: /house|maison/i
 };
-function rowsToStudents(rows, fallbackClass){
+function yearFromClass(cls){ const m = String(cls||'').match(/\d+/); return m ? +m[0] : null; }
+function rowsToStudents(rows, fallbackClass, forceClass, requireHeader){
   let head = -1, map = {};
-  for (let r = 0; r < Math.min(rows.length, 12); r++){
+  for (let r = 0; r < Math.min(rows.length, 15); r++){
     const m = {};
     rows[r].forEach((cell, i) => {
       const t = String(cell || '').trim();
@@ -2023,20 +2029,25 @@ function rowsToStudents(rows, fallbackClass){
     });
     // "Nom" alongside "Prénom" is a surname column, not a full name
     if (m.first !== undefined && m.last === undefined && m.full !== undefined){ m.last = m.full; delete m.full; }
-    if (m.full !== undefined || m.first !== undefined || m.last !== undefined){ head = r; map = m; break; }
+    if (m.full !== undefined || (m.first !== undefined && m.last !== undefined)){ head = r; map = m; break; }
   }
+  if (head < 0 && requireHeader) return [];  // no real Surname/Forename header: not a roster, skip it
   const out = [];
   const push = (name, cls, yr, house, strict) => {
     name = String(name||'').replace(/\s+/g,' ').trim();
     if (!name || (strict && name.split(' ').length < 2)) return;
     if (/^(name|nom|pr[ée]nom|student|[ée]l[èe]ve|total|classe|class)$/i.test(name)) return;
-    cls = String(cls || fallbackClass || '').trim().toUpperCase();
+    cls = forceClass ? fallbackClass : String(cls || fallbackClass || '').trim().toUpperCase();
     if (!cls) return;
-    out.push({ full_name: name, class_name: cls, year_group: +yr || parseInt(cls,10) || 7, house: String(house||'').trim() });
+    out.push({ full_name: name, class_name: cls, year_group: +yr || yearFromClass(cls) || 7, house: String(house||'').trim() });
   };
   if (head >= 0){
     for (let r = head+1; r < rows.length; r++){
       const c = rows[r];
+      if (!c || !c.length) continue;
+      // stop at a totals/summary line ("Total: 5 | Boys: 2 ...", "Average Age: ...")
+      const rowText = c.map(x => String(x||'')).join(' ');
+      if (/^total\b|^average\b/i.test(rowText.trim())) break;
       const name = map.full !== undefined ? c[map.full]
         : [c[map.first], c[map.last]].filter(Boolean).join(' ');
       push(name, map.cls !== undefined ? c[map.cls] : '', map.year !== undefined ? c[map.year] : '',
@@ -2053,50 +2064,92 @@ async function readRoster(file, fallbackClass){
     const pg = await pdfPages(file);
     const rows = [];
     for (const p of pg) for (const l of linesOf(p.items)) rows.push([l.items.map(i => i.str).join(' ').replace(/^\d+[.)]?\s*/,'')]);
-    return rowsToStudents(rows, fallbackClass);
+    return [{ class_name: fallbackClass, rows: rowsToStudents(rows, fallbackClass) }];
   }
-  if (name.endsWith('.csv')) return rowsToStudents(parseCSV(await file.text()), fallbackClass);
+  if (name.endsWith('.csv')){
+    const rows = rowsToStudents(parseCSV(await file.text()), fallbackClass);
+    // a CSV can still carry its own class column per row, so group by whatever came out
+    const byClass = {};
+    rows.forEach(r => (byClass[r.class_name] = byClass[r.class_name] || []).push(r));
+    return Object.keys(byClass).map(c => ({ class_name: c, rows: byClass[c] }));
+  }
+  // XLSX: one sheet = one class. The sheet's own tab name is the class,
+  // even if a column inside the sheet also says a class name.
   const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
   const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type:'array' });
-  const rows = [];
-  wb.SheetNames.forEach(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header:1, blankrows:false })
-    .forEach(r => rows.push(r.map(c => c == null ? '' : c))));
-  return rowsToStudents(rows, fallbackClass);
+  return wb.SheetNames.map(n => {
+    const cls = n.trim().toUpperCase();
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header:1, blankrows:false })
+      .map(r => r.map(c => c == null ? '' : c));
+    return { class_name: cls, rows: rowsToStudents(rows, cls, true, true) };
+  }).filter(sh => sh.rows.length);
 }
 let rosterDraft = [];
 $('#fileRoster').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   msg('#rosterMsg', 'Reading the file…', 'info'); $('#rosterPreview').innerHTML = '';
   try {
-    rosterDraft = await readRoster(f, $('#rosterClass').value);
-    if (!rosterDraft.length) throw new Error('No names found. The file needs a name column, or one full name per line.');
-    const byClass = {};
-    rosterDraft.forEach(r => byClass[r.class_name] = (byClass[r.class_name]||0) + 1);
-    $('#rosterPreview').innerHTML = `<div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Name</th><th>Class</th><th class="num">Year</th></tr></thead><tbody>
-      ${rosterDraft.slice(0,8).map(r => `<tr><td class="namecell">${esc(r.full_name)}</td><td>${esc(r.class_name)}</td><td class="num">${r.year_group}</td></tr>`).join('')}
+    const sheets = await readRoster(f, $('#rosterClass').value);
+    const total = sheets.reduce((n,sh) => n + sh.rows.length, 0);
+    if (!total) throw new Error('No names found. Each sheet needs a name column, or one full name per line.');
+    rosterDraft = sheets;
+    $('#rosterPreview').innerHTML = `<div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Class (from sheet)</th><th class="num">Students</th></tr></thead><tbody>
+      ${sheets.map(sh => `<tr><td class="namecell">${esc(sh.class_name)}</td><td class="num">${sh.rows.length}</td></tr>`).join('')}
       </tbody></table></div>`;
-    msg('#rosterMsg', `${rosterDraft.length} students found (${Object.entries(byClass).map(([c,n]) => c+': '+n).join(', ')}). Check the first rows, then Import.`, 'ok');
+    msg('#rosterMsg', `${total} students across ${sheets.length} class${sheets.length===1?'':'es'}. Check the classes above, then Import.`, 'ok');
   } catch (err){ msg('#rosterMsg', err.message, 'err'); rosterDraft = []; }
 };
 $('#btnImportRoster').onclick = async () => {
   if (!rosterDraft.length) return msg('#rosterMsg', 'Choose a file first.', 'err');
   try {
-    const classes = uniq(rosterDraft.map(r => r.class_name));
+    const classes = uniq(rosterDraft.map(sh => sh.class_name));
     await DB.upsert(T.classes, classes.filter(c => !S.classes.some(x => x.class_name === c)).map(c => ({
-      class_name: c, year_group: (rosterDraft.find(r => r.class_name === c)||{}).year_group || 7, join_code: mkCode(c)
+      class_name: c, year_group: yearFromClass(c) || 7, join_code: mkCode(c)
     })), ['class_name']);
-    const rows = rosterDraft.map(r => {
-      const ex = S.students.find(s => s.class_name === r.class_name && s.full_name.toLowerCase() === r.full_name.toLowerCase());
-      let code = `${r.class_name}-${slug(r.full_name)}`, n = 1;
-      while (!ex && S.students.some(s => s.code === code)) code = `${r.class_name}-${slug(r.full_name)}-${++n}`;
-      return ex ? { id: ex.id, ...r } : { code, ...r, pin: '', wd_carry: 0 };
-    });
-    await DB.upsert(T.students, rows, ['code']);
-    S.students = await DB.select(T.students, null, '*');
     S.classes = await DB.select(T.classes);
+
+    // Work against a local copy so a student added from one sheet is
+    // recognised by name when a later sheet in the same file mentions them.
+    const working = S.students.slice();
+    const findExisting = (name, year) => working.find(s =>
+      s.full_name.toLowerCase() === name.toLowerCase() && (!year || !s.year_group || +s.year_group === +year));
+
+    const newStudents = [], memberships = [];
+    let already = 0;
+    for (const sh of rosterDraft){
+      for (const r of sh.rows){
+        const ex = findExisting(r.full_name, r.year_group);
+        if (ex){
+          if (ex.class_name !== r.class_name) memberships.push({ student_id: ex.id, class_name: r.class_name });
+          already++;
+          continue;
+        }
+        let code = `${r.class_name}-${slug(r.full_name)}`, n = 1;
+        while (working.some(s => s.code === code) || newStudents.some(s => s.code === code)) code = `${r.class_name}-${slug(r.full_name)}-${++n}`;
+        const rec = { code, full_name: r.full_name, class_name: r.class_name, year_group: r.year_group, house: r.house, pin: '', wd_carry: 0 };
+        newStudents.push(rec);
+        working.push({ ...rec, id: 'tmp:' + code });  // placeholder id so later sheets still match by name
+      }
+    }
+    if (newStudents.length) await DB.upsert(T.students, newStudents, ['code']);
+    S.students = await DB.select(T.students, null, '*');
+
+    // resolve the temporary ids in `memberships` created against brand-new students
+    const bycode = {}; S.students.forEach(s => bycode[s.code] = s.id);
+    const finalMemberships = [];
+    for (const m of memberships){
+      const sid = typeof m.student_id === 'string' && m.student_id.startsWith('tmp:')
+        ? bycode[m.student_id.slice(4)] : m.student_id;
+      if (sid != null) finalMemberships.push({ student_id: sid, class_name: m.class_name });
+    }
+    if (finalMemberships.length) await DB.upsert(T.memberships, finalMemberships, ['student_id','class_name']);
+    S.memberships = await DB.select(T.memberships);
+
     rosterDraft = []; $('#fileRoster').value = ''; $('#rosterPreview').innerHTML = '';
     fillClassSelects(); renderClasses(); renderStudents();
-    msg('#rosterMsg', `${rows.length} students ready. Give each class its code and they can sign in.`, 'ok');
+    const parts = [`${newStudents.length} new student${newStudents.length===1?'':'s'}`];
+    if (already) parts.push(`${already} already existed and ${already===1?'was':'were'} added to their new class too`);
+    msg('#rosterMsg', parts.join(', ') + '. Give each class its code and they can sign in.', 'ok');
   } catch (err){ msg('#rosterMsg', err.message, 'err'); }
 };
 
