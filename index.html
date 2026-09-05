@@ -637,7 +637,11 @@ const DB = {
       let q = this.sb.from(table).select(cols || '*');
       if (match) for (const k in match){ q = Array.isArray(match[k]) ? q.in(k, match[k]) : q.eq(k, match[k]); }
       const { data, error } = await q;
-      if (error) throw error;
+      if (error){
+        if (error.code === 'PGRST205' || /schema cache/i.test(error.message||''))
+          throw new Error(`The database is missing the "${table}" table. Rerun supabase-setup.sql in the Supabase SQL editor (the whole file \u2014 it is safe to run again).`);
+        throw new Error(`Reading "${table}" failed: ${error.message}`);
+      }
       return data || [];
     }
     let rows = this._ls(table);
@@ -1978,7 +1982,8 @@ function renderClasses(){
       <td class="num">${c.year_group}</td>
       <td><input class="codein mono" data-code="${esc(c.class_name)}" value="${esc(c.join_code||'')}" placeholder="no code" style="width:120px; padding:5px 7px; border:1px solid var(--line); border-radius:7px; text-transform:uppercase"></td>
       <td class="num">${classStudents(c.class_name).length}</td>
-      <td class="noprint"><button class="btn sm" data-newcode="${esc(c.class_name)}">New code</button></td></tr>`).join('')}
+      <td class="noprint"><button class="btn sm" data-newcode="${esc(c.class_name)}">New code</button>
+        <button class="btn sm danger" data-delclass="${esc(c.class_name)}">Delete</button></td></tr>`).join('')}
     </tbody></table>`;
   $$('#classTable .codein').forEach(i => i.onchange = async () => {
     await DB.update(T.classes, { class_name: i.dataset.code }, { join_code: i.value.trim().toUpperCase() });
@@ -1987,6 +1992,21 @@ function renderClasses(){
   $$('#classTable [data-newcode]').forEach(b => b.onclick = async () => {
     await DB.update(T.classes, { class_name: b.dataset.newcode }, { join_code: mkCode(b.dataset.newcode) });
     S.classes = await DB.select(T.classes); renderClasses();
+  });
+  $$('#classTable [data-delclass]').forEach(b => b.onclick = async () => {
+    const cls = b.dataset.delclass, n = classStudents(cls).length;
+    if (!confirm(`Delete "${cls}"? This removes ${n} student${n===1?'':'s'} whose home class is ${cls} \u2014 along with their marks and points \u2014 and drops ${cls} from anyone else's list of classes. This cannot be undone.`)) return;
+    await DB.remove(T.students, { class_name: cls });
+    await DB.remove(T.memberships, { class_name: cls });
+    await DB.remove(T.access, { class_name: cls });
+    await DB.remove(T.programme, { class_name: cls });
+    await DB.remove(T.classes, { class_name: cls });
+    S.students = await DB.select(T.students, null, '*');
+    S.memberships = await DB.select(T.memberships);
+    S.classes = await DB.select(T.classes);
+    S.access = await DB.select(T.access);
+    S.programme = await DB.select(T.programme);
+    fillClassSelects(); renderClasses(); renderStudents();
   });
   const cur = $('#rosterClass').value;
   $('#rosterClass').innerHTML = rows.map(c => `<option>${esc(c.class_name)}</option>`).join('') || '<option value="">add a class first</option>';
