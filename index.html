@@ -368,8 +368,8 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 <!-- ============ TEACHER ============ -->
 <section id="scr-teacher" class="hide">
   <nav class="tnav" id="tnav">
-    <button data-t="marks" aria-selected="true">Marks</button>
-    <button data-t="awards" aria-selected="false">Points</button>
+    <button data-t="marks" aria-selected="true">Assess</button>
+    <button data-t="awards" aria-selected="false">Rewards</button>
     <button data-t="programme" aria-selected="false">Programme</button>
     <button data-t="grids" aria-selected="false">Grids</button>
     <button data-t="setup" aria-selected="false">Setup</button>
@@ -377,6 +377,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- marks -->
   <div id="t-marks">
+    <p class="muted small noprint" style="margin:0 0 12px">Give each student a level 1&ndash;4 on every skill: T1 first lesson, T2 mid unit, T3 last lesson.</p>
     <div class="toolbar">
       <label class="field"><span>Class</span><select id="mClass"></select></label>
       <label class="field"><span>Sport</span><select id="mSport"></select></label>
@@ -395,6 +396,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- awards -->
   <div id="t-awards" class="hide">
+    <p class="muted small noprint" style="margin:0 0 12px">Turns your <b>T3 marks</b> into house points, then into Well Done points. Nothing shows here until T3 is filled in.</p>
     <div class="toolbar">
       <label class="field"><span>Class</span><select id="aClass"></select></label>
       <label class="field"><span>Sport</span><select id="aSport"></select></label>
@@ -410,6 +412,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- grids -->
   <div id="t-grids" class="hide">
+    <p class="muted small noprint" style="margin:0 0 12px">The assessment sheets themselves: skills, the four level descriptions, and the technical notes.</p>
     <div class="toolbar">
       <label class="field"><span>Grid</span><select id="gSelect"></select></label>
       <button class="btn sm" id="btnPrintGrid">Print blank grid</button>
@@ -448,6 +451,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- programme -->
   <div id="t-programme" class="hide">
+    <p class="muted small noprint" style="margin:0 0 12px">Who does what, and when students may fill in their own grid.</p>
     <div class="card pad">
       <h3>Programme</h3>
       <p class="muted small">Which class does which sport, in which term. Students can self-assess a sport while its term is the current one.</p>
@@ -488,6 +492,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- setup -->
   <div id="t-setup" class="hide">
+    <p class="muted small noprint" style="margin:0 0 12px">Start-of-year jobs: teachers, classes and codes, student lists, points values.</p>
     <div class="card pad">
       <h3>Classes and access codes</h3>
       <p class="muted small">Students must type their class code before they can see the names in that class. Leave a code empty to let anyone in.</p>
