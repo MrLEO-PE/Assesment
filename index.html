@@ -274,7 +274,10 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
 .note{margin-bottom:14px}
 .note h3{font-size:.95rem; margin-bottom:3px}
 .note p{margin:0; font-size:.9rem; color:#3D474F}
-.cmp.teacher .arrow{ color:var(--brand-2) }
+.gaptag{ font-family:var(--mono); font-size:.7rem; padding:2px 6px; border-radius:6px; margin-left:6px }
+.gaptag.gap0{ background:#E9F3ED; color:var(--l4) }
+.gaptag.gap1{ background:#F7EFDD; color:var(--gold) }
+.gaptag.gap2{ background:#FBEDE7; color:var(--warn) }
 .cmp{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:7px 0; border-bottom:1px solid var(--line); font-size:.9rem}
 .cmp:last-child{border-bottom:0}
 .cmp .arrow{display:inline-block; width:20px; text-align:center; color:var(--muted)}
@@ -1436,29 +1439,43 @@ function renderLadders(){
     updateProgress();
     saveOne(idx, +b.dataset.l);
   });
+  // A checkpoint's gap (self vs teacher, same test) is safe to show as soon as
+  // BOTH marks for that checkpoint exist. Final Test's gap is naturally gated on
+  // the student's own self2 existing, so the teacher's t3 marks can never leak
+  // to a student who hasn't self-assessed the final test yet.
+  const s1t1 = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 't1', k.idx)||{}).level }));
+  const s2t3 = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self2', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 't3', k.idx)||{}).level }));
+  const hasS1T1 = s1t1.some(x => x.a && x.b);
+  const hasS2T3 = s2t3.some(x => x.a && x.b);
+  const sumOf = arr => { const v = arr.filter(Boolean); return v.length ? v.reduce((a,b) => a+b, 0) : null; };
+  const gapRows = pairs => pairs.filter(x => x.a && x.b).map(x => {
+    const d = Math.abs(x.a - x.b), cls = d === 0 ? 'gap0' : d === 1 ? 'gap1' : 'gap2';
+    return `<div class="cmp"><span>${esc(x.k.name)}</span>
+      <span><span class="lvlbadge lv${x.a}">${x.a}</span><span class="tiny muted" style="margin:0 5px">vs</span><span class="lvlbadge lv${x.b}">${x.b}</span>
+      <span class="gaptag ${cls}">${d === 0 ? 'match' : d + ' off'}</span></span></div>`;
+  }).join('');
+  const avgGap = pairs => { const v = pairs.filter(x => x.a && x.b).map(x => Math.abs(x.a-x.b)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+  const g1 = avgGap(s1t1), g2 = avgGap(s2t3);
+
+  // Progression only compares the SAME assessor across time (self1\u2192self2,
+  // or t1\u2192t3) \u2014 never mixes self and teacher, and never shown until
+  // hasS2T3 is true (i.e. the student has done their own final self-assessment).
   const bothSelf = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 'self2', k.idx)||{}).level }));
   const bothTeach = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 't1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 't3', k.idx)||{}).level }));
-  const anySelf = bothSelf.some(x => x.a) && bothSelf.some(x => x.b);
-  const anyTeach = bothTeach.some(x => x.a) && bothTeach.some(x => x.b);
-  const sumOf = arr => { const v = arr.filter(Boolean); return v.length ? v.reduce((a,b) => a+b, 0) : null; };
   const progOf = both => { const a = sumOf(both.map(x => x.a)), b = sumOf(both.map(x => x.b)); return (a !== null && b !== null) ? b - a : null; };
-  const selfProg = progOf(bothSelf), teachProg = progOf(bothTeach);
-  const gaps = sk.map(k => { const a = (markOf(S.user.id,g.id,'self2',k.idx)||{}).level, b = (markOf(S.user.id,g.id,'t3',k.idx)||{}).level; return (a&&b) ? Math.abs(a-b) : null; }).filter(x => x !== null);
-  const gapAvg = gaps.length ? (gaps.reduce((a,b)=>a+b,0)/gaps.length) : null;
+  const selfProg = hasS2T3 ? progOf(bothSelf) : null;
+  const teachProg = hasS2T3 ? progOf(bothTeach) : null;
   const award = S.awards.find(x => x.grid_id === g.id);
-  const rowsOf = (both, cls) => both.map(x => `<div class="cmp ${cls}"><span>${esc(x.k.name)}</span>
-        <span><span class="lvlbadge lv${x.a||0}">${x.a||'·'}</span>
-        <span class="arrow">${x.b > x.a ? '&uarr;' : x.b && x.b < x.a ? '&darr;' : '&rarr;'}</span>
-        <span class="lvlbadge lv${x.b||0}">${x.b||'·'}</span></span></div>`).join('');
-  $('#compare').innerHTML = (!anySelf && !anyTeach) ? '' : `<div class="card pad" style="margin-bottom:16px">
-      ${anySelf ? `<span class="eyebrow">Your self-assessment: Test 1 &rarr; Final Test</span>${rowsOf(bothSelf,'')}` : ''}
-      ${anyTeach ? `<span class="eyebrow" style="display:block; margin-top:${anySelf?'14px':'0'}">Your teacher's marks: Test 1 &rarr; Final Test</span>${rowsOf(bothTeach,'teacher')}` : ''}
-      ${(selfProg !== null || teachProg !== null || gapAvg !== null || award) ? `<div style="border-top:1px solid var(--line); margin-top:12px; padding-top:10px">
-        ${selfProg !== null ? `<div class="cmp"><span>Progress you noted</span><span class="${selfProg>0?'gap0':''}">${selfProg>0?'+':''}${selfProg}</span></div>` : ''}
-        ${teachProg !== null ? `<div class="cmp"><span>Progress your teacher noted</span><span class="${teachProg>0?'gap0':''}">${teachProg>0?'+':''}${teachProg}</span></div>` : ''}
-        ${gapAvg !== null ? `<div class="cmp"><span>How close your final self-assessment was</span><span>${gapAvg.toFixed(1)} level${gapAvg===1?'':'s'} off</span></div>` : ''}
-        ${award ? `<div class="cmp"><span>House points earned</span><span class="pill hp">${award.hp}</span></div>` : ''}
+
+  $('#compare').innerHTML = (!hasS1T1 && !hasS2T3 && !award) ? '' : `<div class="card pad" style="margin-bottom:16px">
+      ${hasS1T1 ? `<span class="eyebrow">Test 1 &mdash; you vs your teacher${g1 !== null ? ` (average ${g1.toFixed(1)} off)` : ''}</span>${gapRows(s1t1)}` : ''}
+      ${hasS2T3 ? `<span class="eyebrow" style="display:block; margin-top:${hasS1T1?'14px':'0'}">Final Test &mdash; you vs your teacher${g2 !== null ? ` (average ${g2.toFixed(1)} off)` : ''}</span>${gapRows(s2t3)}` : ''}
+      ${(hasS2T3 && (selfProg !== null || teachProg !== null)) ? `<div style="border-top:1px solid var(--line); margin-top:12px; padding-top:10px">
+        <span class="eyebrow" style="display:block; margin-bottom:6px">Progression: Test 1 &rarr; Final Test</span>
+        ${selfProg !== null ? `<div class="cmp"><span>Levels you noted for yourself</span><span class="${selfProg>0?'gap0':''}">${selfProg>0?'+':''}${selfProg}</span></div>` : ''}
+        ${teachProg !== null ? `<div class="cmp"><span>Levels your teacher noted</span><span class="${teachProg>0?'gap0':''}">${teachProg>0?'+':''}${teachProg}</span></div>` : ''}
       </div>` : ''}
+      ${award ? `<div class="cmp" style="border-top:1px solid var(--line); margin-top:12px; padding-top:10px"><span>House points earned</span><span class="pill hp">${award.hp}</span></div>` : ''}
     </div>`;
   const notes = sk.filter(k => (k.notes||'').trim());
   $('#notes').innerHTML = !notes.length ? '' :
