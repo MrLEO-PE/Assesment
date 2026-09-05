@@ -1612,19 +1612,28 @@ async function ensureAllAwards(){
   try { S.allAwards = await DB.select(T.awards, { student_id: allIds }); }
   catch (e){ S.allAwards = S.allAwards || []; msg('#awardMsg', 'Could not load school-wide house points: ' + e.message, 'err'); }
 }
+const NO_HOUSE = 'No house set';
+function houseKeys(){
+  const real = uniq(S.students.map(s => s.house)).filter(Boolean).sort();
+  const anyMissing = S.students.some(s => !s.house);
+  return anyMissing ? [...real, NO_HOUSE] : real;
+}
 function houseTotals(students){
-  const houses = uniq(S.students.map(s => s.house)).filter(Boolean).sort();
+  const houses = houseKeys();
   const ids = new Set(students.map(s => s.id));
   const totals = {}; houses.forEach(h => totals[h] = 0);
+  let dropped = 0;
   (S.allAwards || []).forEach(a => {
     if (!ids.has(a.student_id)) return;
     const st = S.students.find(s => s.id === a.student_id);
-    if (st && st.house) totals[st.house] = (totals[st.house] || 0) + (a.hp || 0);
+    if (!st){ dropped += (a.hp || 0); return; }  // award for a student not in this scope's roster snapshot
+    const key = st.house || NO_HOUSE;
+    totals[key] = (totals[key] || 0) + (a.hp || 0);
   });
-  return { houses, totals };
+  return { houses, totals, dropped };
 }
 function renderHouseBoard(cls){
-  const houses = uniq(S.students.map(s => s.house)).filter(Boolean).sort();
+  const houses = houseKeys();
   if (!houses.length){ $('#houseBoard').innerHTML = ''; return; }
   const year = (S.students.find(s => s.class_name === cls) || {}).year_group;
   const rows = [
@@ -1632,8 +1641,12 @@ function renderHouseBoard(cls){
     ['Year group', S.students.filter(s => +s.year_group === +year)],
     ['Whole school', S.students],
   ];
-  $('#houseBoard').innerHTML = `<div class="tablewrap"><table><thead><tr><th>House points</th>
-    ${houses.map(h => `<th class="num"><span class="house-pill" style="background:${HOUSE_COLOR(h)}">${esc(h)}</span></th>`).join('')}
+  const missingCount = S.students.filter(s => !s.house).length;
+  $('#houseBoard').innerHTML = (missingCount ? `<p class="tiny muted" style="margin:0 0 8px">
+      <b style="color:var(--warn)">${missingCount} student${missingCount===1?'':'s'}</b> ${missingCount===1?'has':'have'} no house set, so their points are counted separately below instead of being dropped. Fix this in Setup &rarr; import or edit their house.
+    </p>` : '')
+    + `<div class="tablewrap"><table><thead><tr><th>House points</th>
+    ${houses.map(h => h === NO_HOUSE ? `<th class="num tiny muted">${esc(h)}</th>` : `<th class="num"><span class="house-pill" style="background:${HOUSE_COLOR(h)}">${esc(h)}</span></th>`).join('')}
     </tr></thead><tbody>
     ${rows.map(([label, students]) => {
       const { totals } = houseTotals(students);
