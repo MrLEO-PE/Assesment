@@ -82,6 +82,9 @@ a{color:var(--brand-2)}
 
 /* ---------- fast marking: tap-to-set levels ---------- */
 .lvlpick{ display:flex; gap:3px; justify-content:center }
+.lvlbtn{ position:relative; overflow:hidden }
+.lvlbtn.selfpick::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:26%; background:var(--gold); pointer-events:none }
+.lvlbtn.selfpick[aria-pressed="true"]::after{ background:rgba(255,255,255,.75) }
 .lvlbtn, .setallbtn{
   width:26px; height:26px; border-radius:6px; border:1px solid var(--line); background:#fff;
   font-family:var(--mono); font-weight:600; font-size:.82rem; color:var(--muted); padding:0;
@@ -95,6 +98,7 @@ a{color:var(--brand-2)}
 th.setall{ font-weight:400; padding-top:4px; padding-bottom:6px }
 th.setall .btnrow{ margin-top:3px }
 .setallbtn{ width:20px; height:20px; font-size:.7rem }
+.setallbtn.clearbtn{ color:var(--warn); font-weight:700 }
 @media (pointer: coarse){
   .lvlbtn{ width:34px; height:34px; font-size:.95rem }
 }
@@ -220,13 +224,18 @@ select.lvl[data-v="4"]{background:var(--l4); color:#fff}
 .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px}
 .toolbar .field{margin:0; min-width:150px}
 .win{display:flex; align-items:center; gap:8px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; background:#fff}
-.switch{position:relative; width:42px; height:24px; flex:none}
-.switch input{opacity:0; width:100%; height:100%; margin:0; cursor:pointer}
-.switch i{position:absolute; inset:0; background:#D5DBD5; border-radius:99px; pointer-events:none; transition:background .2s}
-.switch i::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .2s; box-shadow:0 1px 2px rgba(0,0,0,.2)}
-.switch input:checked + i{background:var(--l3)}
-.switch input:checked + i::after{transform:translateX(18px)}
-.switch input:focus-visible + i{outline:3px solid var(--brand-2); outline-offset:2px}
+.tswitch{
+  position:relative; width:42px; height:24px; flex:none; border:0; border-radius:99px;
+  background:#D5DBD5; padding:0; cursor:pointer; -webkit-appearance:none; appearance:none;
+  transition:background .18s ease;
+}
+.tswitch::after{
+  content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+  background:#fff; transition:transform .18s ease; box-shadow:0 1px 2px rgba(0,0,0,.25);
+}
+.tswitch[aria-checked="true"]{ background:var(--l3) }
+.tswitch[aria-checked="true"]::after{ transform:translateX(18px) }
+.tswitch:focus-visible{ outline:3px solid var(--brand-2); outline-offset:2px }
 .kpi{display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); margin-bottom:14px}
 .kpi .card{padding:12px}
 .kpi .v{font-family:var(--display); font-weight:800; font-size:1.5rem}
@@ -265,6 +274,7 @@ ol.setup li{margin-bottom:9px; font-size:.92rem}
 .note{margin-bottom:14px}
 .note h3{font-size:.95rem; margin-bottom:3px}
 .note p{margin:0; font-size:.9rem; color:#3D474F}
+.cmp.teacher .arrow{ color:var(--brand-2) }
 .cmp{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:7px 0; border-bottom:1px solid var(--line); font-size:.9rem}
 .cmp:last-child{border-bottom:0}
 .cmp .arrow{display:inline-block; width:20px; text-align:center; color:var(--muted)}
@@ -428,6 +438,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
       <p class="tiny muted" style="margin:10px 0 0">
         <b>self</b> = what the student put. <b>mine</b> = your mark. <b>Progress</b> = levels gained between your Test 1 and your Final Test.
         <b>Gap</b> = how far the student's Final Test self-assessment sits from your Final Test mark, per skill.
+        A <span style="color:var(--gold); font-weight:700">gold</span> strip on a level button in Enter Test 1 / Enter Final Test shows what the student picked for themselves.
       </p>
     </div>
   </div>
@@ -1425,14 +1436,29 @@ function renderLadders(){
     updateProgress();
     saveOne(idx, +b.dataset.l);
   });
-  const both = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 'self2', k.idx)||{}).level }));
-  const anyCompare = both.some(x => x.a) && both.some(x => x.b);
-  $('#compare').innerHTML = !anyCompare ? '' : `<div class="card pad" style="margin-bottom:16px">
-      <span class="eyebrow">Test 1 &rarr; final test</span>
-      ${both.map(x => `<div class="cmp"><span>${esc(x.k.name)}</span>
+  const bothSelf = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 'self1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 'self2', k.idx)||{}).level }));
+  const bothTeach = sk.map(k => ({ k, a: (markOf(S.user.id, g.id, 't1', k.idx)||{}).level, b: (markOf(S.user.id, g.id, 't3', k.idx)||{}).level }));
+  const anySelf = bothSelf.some(x => x.a) && bothSelf.some(x => x.b);
+  const anyTeach = bothTeach.some(x => x.a) && bothTeach.some(x => x.b);
+  const sumOf = arr => { const v = arr.filter(Boolean); return v.length ? v.reduce((a,b) => a+b, 0) : null; };
+  const progOf = both => { const a = sumOf(both.map(x => x.a)), b = sumOf(both.map(x => x.b)); return (a !== null && b !== null) ? b - a : null; };
+  const selfProg = progOf(bothSelf), teachProg = progOf(bothTeach);
+  const gaps = sk.map(k => { const a = (markOf(S.user.id,g.id,'self2',k.idx)||{}).level, b = (markOf(S.user.id,g.id,'t3',k.idx)||{}).level; return (a&&b) ? Math.abs(a-b) : null; }).filter(x => x !== null);
+  const gapAvg = gaps.length ? (gaps.reduce((a,b)=>a+b,0)/gaps.length) : null;
+  const award = S.awards.find(x => x.grid_id === g.id);
+  const rowsOf = (both, cls) => both.map(x => `<div class="cmp ${cls}"><span>${esc(x.k.name)}</span>
         <span><span class="lvlbadge lv${x.a||0}">${x.a||'·'}</span>
         <span class="arrow">${x.b > x.a ? '&uarr;' : x.b && x.b < x.a ? '&darr;' : '&rarr;'}</span>
-        <span class="lvlbadge lv${x.b||0}">${x.b||'·'}</span></span></div>`).join('')}
+        <span class="lvlbadge lv${x.b||0}">${x.b||'·'}</span></span></div>`).join('');
+  $('#compare').innerHTML = (!anySelf && !anyTeach) ? '' : `<div class="card pad" style="margin-bottom:16px">
+      ${anySelf ? `<span class="eyebrow">Your self-assessment: Test 1 &rarr; Final Test</span>${rowsOf(bothSelf,'')}` : ''}
+      ${anyTeach ? `<span class="eyebrow" style="display:block; margin-top:${anySelf?'14px':'0'}">Your teacher's marks: Test 1 &rarr; Final Test</span>${rowsOf(bothTeach,'teacher')}` : ''}
+      ${(selfProg !== null || teachProg !== null || gapAvg !== null || award) ? `<div style="border-top:1px solid var(--line); margin-top:12px; padding-top:10px">
+        ${selfProg !== null ? `<div class="cmp"><span>Progress you noted</span><span class="${selfProg>0?'gap0':''}">${selfProg>0?'+':''}${selfProg}</span></div>` : ''}
+        ${teachProg !== null ? `<div class="cmp"><span>Progress your teacher noted</span><span class="${teachProg>0?'gap0':''}">${teachProg>0?'+':''}${teachProg}</span></div>` : ''}
+        ${gapAvg !== null ? `<div class="cmp"><span>How close your final self-assessment was</span><span>${gapAvg.toFixed(1)} level${gapAvg===1?'':'s'} off</span></div>` : ''}
+        ${award ? `<div class="cmp"><span>House points earned</span><span class="pill hp">${award.hp}</span></div>` : ''}
+      </div>` : ''}
     </div>`;
   const notes = sk.filter(k => (k.notes||'').trim());
   $('#notes').innerHTML = !notes.length ? '' :
@@ -1567,13 +1593,15 @@ async function renderMarks(){
       ${sk.map(s => `<th class="num" title="${esc(s.name)}">${s.idx}. ${esc(s.name.length > 18 ? s.name.slice(0,17)+'…' : s.name)}</th>`).join('')}
       <th class="num" rowspan="2">Total</th></tr>
       <tr>${sk.map(s => `<th class="num setall" data-idx="${s.idx}"><span class="tiny muted">Set all</span>
-        <span class="btnrow" style="justify-content:center; gap:3px">${[1,2,3,4].map(l => `<button type="button" class="setallbtn lv${l}" data-l="${l}">${l}</button>`).join('')}</span></th>`).join('')}
+        <span class="btnrow" style="justify-content:center; gap:3px">${[1,2,3,4].map(l => `<button type="button" class="setallbtn lv${l}" data-l="${l}">${l}</button>`).join('')}<button type="button" class="setallbtn clearbtn" data-l="0" title="Clear this skill for everyone">&times;</button></span></th>`).join('')}
       </tr></thead><tbody>
       ${kids.map(k => {
+        const selfPhase = ph === 't1' ? 'self1' : 'self2';
         const cells = sk.map(s => {
           const v = (markOf(k.id, g.id, ph, s.idx)||{}).level || '';
+          const sv = (markOf(k.id, g.id, selfPhase, s.idx)||{}).level || '';
           return `<td class="num"><div class="lvlpick" data-sid="${k.id}" data-idx="${s.idx}">
-            ${[1,2,3,4].map(l => `<button type="button" class="lvlbtn lv${l}" data-l="${l}" aria-pressed="${v==l}">${l}</button>`).join('')}
+            ${[1,2,3,4].map(l => `<button type="button" class="lvlbtn lv${l} ${sv==l?'selfpick':''}" data-l="${l}" aria-pressed="${v==l}" ${sv==l?`title="This student put themselves at level ${l}"`:''}>${l}</button>`).join('')}
           </div></td>`;
         }).join('');
         const tt = sk.map(s => (markOf(k.id,g.id,ph,s.idx)||{}).level).filter(Boolean).reduce((a,b)=>a+b,0);
@@ -1615,12 +1643,19 @@ async function renderMarks(){
   $$('#marksTable .setallbtn').forEach(btn => btn.onclick = async () => {
     const idx = +btn.closest('.setall').dataset.idx, lvl = +btn.dataset.l;
     const cls = $('#mClass').value, kidsNow = classStudents(cls);
-    if (!confirm(`Set every student in ${cls} to level ${lvl} for skill ${idx}? You can still adjust anyone by hand afterwards.`)) return;
-    const rows = kidsNow.map(k => {
-      const ex = markOf(k.id, g.id, marksPhase, idx);
-      return { ...(ex ? { id: ex.id } : {}), student_id: k.id, grid_id: g.id, phase: marksPhase, skill_idx: idx, level: lvl };
-    });
-    await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
+    const clearing = lvl === 0;
+    if (!confirm(clearing
+      ? `Clear skill ${idx} for every student in ${cls}? This removes anything already marked here.`
+      : `Set every student in ${cls} to level ${lvl} for skill ${idx}? You can still adjust anyone by hand afterwards.`)) return;
+    if (clearing){
+      for (const k of kidsNow){ const ex = markOf(k.id, g.id, marksPhase, idx); if (ex) await DB.remove(T.marks, { id: ex.id }); }
+    } else {
+      const rows = kidsNow.map(k => {
+        const ex = markOf(k.id, g.id, marksPhase, idx);
+        return { ...(ex ? { id: ex.id } : {}), student_id: k.id, grid_id: g.id, phase: marksPhase, skill_idx: idx, level: lvl };
+      });
+      await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
+    }
     await loadMarks(g.id, kidsNow.map(k => k.id));
     renderMarks();
   });
@@ -1965,12 +2000,16 @@ function renderAccess(){
         const kids = classStudents(c);
         const done = ph => g ? kids.filter(k => phaseDone(k.id, g.id, ph)).length : 0;
         return `<tr><td class="namecell">${esc(c)}</td><td class="num">${kids.length}</td>
-          <td><label class="switch"><input type="checkbox" data-ac="${esc(c)}" data-ph="test1_open" ${a.test1_open ? 'checked' : ''}><i></i></label></td>
-          <td><label class="switch"><input type="checkbox" data-ac="${esc(c)}" data-ph="final_open" ${a.final_open ? 'checked' : ''}><i></i></label></td>
+          <td><button type="button" class="tswitch" role="switch" aria-checked="${!!a.test1_open}" data-ac="${esc(c)}" data-ph="test1_open"></button></td>
+          <td><button type="button" class="tswitch" role="switch" aria-checked="${!!a.final_open}" data-ac="${esc(c)}" data-ph="final_open"></button></td>
           <td class="num tiny">${done('self1')} / ${done('self2')}</td></tr>`;
       }).join('')}</tbody></table>
       <p class="tiny muted" style="margin:10px 0 0">Done = how many have saved Test 1 / the Final test.</p>`;
-  $$('#accessTable [data-ac]').forEach(c => c.onchange = () => setAccess(c.dataset.ac, sport, { [c.dataset.ph]: c.checked }));
+  $$('#accessTable [data-ac]').forEach(b => b.onclick = () => {
+    const on = b.getAttribute('aria-checked') !== 'true';
+    b.setAttribute('aria-checked', String(on));
+    setAccess(b.dataset.ac, sport, { [b.dataset.ph]: on });
+  });
 }
 async function setAccess(cls, sport, patch){
   const a = accessOf(cls, sport);
@@ -2069,12 +2108,21 @@ function renderClasses(){
       <td class="num">${c.year_group}</td>
       <td><input class="codein mono" data-code="${esc(c.class_name)}" value="${esc(c.join_code||'')}" placeholder="no code" style="width:120px; padding:5px 7px; border:1px solid var(--line); border-radius:7px; text-transform:uppercase"></td>
       <td class="num">${classStudents(c.class_name).length}</td>
-      <td class="noprint"><button class="btn sm" data-newcode="${esc(c.class_name)}">New code</button>
+      <td class="noprint"><button class="btn sm" data-copycode="${esc(c.join_code||'')}">Copy code</button>
+        <button class="btn sm" data-newcode="${esc(c.class_name)}">New code</button>
         <button class="btn sm danger" data-delclass="${esc(c.class_name)}">Delete</button></td></tr>`).join('')}
     </tbody></table>`;
   $$('#classTable .codein').forEach(i => i.onchange = async () => {
     await DB.update(T.classes, { class_name: i.dataset.code }, { join_code: i.value.trim().toUpperCase() });
     S.classes = await DB.select(T.classes);
+  });
+  $$('#classTable [data-copycode]').forEach(b => b.onclick = async () => {
+    const code = b.dataset.copycode;
+    if (!code){ b.textContent = 'No code set'; setTimeout(() => b.textContent = 'Copy code', 1200); return; }
+    try { await navigator.clipboard.writeText(code); }
+    catch { /* clipboard blocked; fall back to showing it */ }
+    const orig = b.textContent; b.textContent = 'Copied!';
+    setTimeout(() => b.textContent = orig, 1200);
   });
   $$('#classTable [data-newcode]').forEach(b => b.onclick = async () => {
     await DB.update(T.classes, { class_name: b.dataset.newcode }, { join_code: mkCode(b.dataset.newcode) });
