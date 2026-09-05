@@ -117,6 +117,24 @@ body.busy-net #busybar.done{ width:100%; transition:width .2s ease; }
   animation:spin .7s linear infinite; margin-right:7px; vertical-align:-2px; flex:none;
 }
 .btn.busy{ opacity:.75; cursor:wait; pointer-events:none; }
+
+/* ---------- programme: simplified layout ---------- */
+.termtabs{ display:flex; gap:6px }
+.termtabs button{
+  flex:1; padding:11px; border:1px solid var(--line); background:#fff; border-radius:11px;
+  font-weight:700; font-size:.92rem; color:var(--muted);
+}
+.termtabs button[aria-selected="true"]{ background:var(--ink); border-color:var(--ink); color:#fff }
+.chiprow{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; flex:1 }
+.sportchip{ display:inline-flex; align-items:center; gap:6px; background:#EDF1F8; color:var(--brand); font-size:.82rem; font-weight:600; padding:5px 6px 5px 10px; border-radius:999px }
+.sportchip button{ border:0; background:transparent; color:var(--brand); font-size:1rem; line-height:1; padding:0 2px; cursor:pointer }
+.addsport{ padding:6px 8px; border:1px dashed var(--line); border-radius:999px; background:#fff; font-size:.82rem; color:var(--muted) }
+.yearrow{ display:flex; align-items:center; gap:12px; padding:9px 0; border-top:1px solid var(--line) }
+.yearrow:first-child{ border-top:0 }
+.yearrow .ylabel{ font-weight:700; width:90px; flex:none }
+.ovrow{ display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line) }
+.ovrow:first-child{ border-top:0 }
+.ovrow .namecell{ width:90px; flex:none }
 /* ---------- login pickers ---------- */
 .pickgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px}
 .pickgrid.tall{grid-template-columns:1fr; max-height:46vh; overflow-y:auto; gap:6px}
@@ -497,32 +515,35 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- programme -->
   <div id="t-programme" class="hide">
-    <p class="muted small noprint" style="margin:0 0 12px">Who does what, and when students may fill in their own grid.</p>
-    <div class="card pad">
-      <h3>Programme</h3>
-      <p class="muted small">Which class does which sport, in which term. Students can self-assess a sport while its term is the current one.</p>
-      <label class="field" style="max-width:220px; margin-top:12px"><span>Current term</span>
-        <select id="setTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
-      <div class="toolbar" style="margin-top:12px">
-        <label class="field"><span>Applies to</span><select id="pScope"></select></label>
-        <label class="field"><span>Term</span><select id="pTerm"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></label>
-        <label class="field"><span>Sport</span><input id="pSport" list="sportOptions" placeholder="Pick or type"><datalist id="sportOptions"></datalist></label>
-        <button class="btn primary sm" id="btnAddProg">Add sport</button>
-      </div>
-      <p class="tiny muted">A sport set for one class replaces the year group's sport for that term, so classes can rotate.</p>
-      <div class="tablewrap" id="progTable"></div>
+    <p class="muted small noprint" style="margin:0 0 12px">What each class does, this term, and whether they can self-assess yet.</p>
+
+    <div class="termtabs" id="termTabs"></div>
+
+    <div class="card pad" style="margin-top:12px">
+      <h3 id="yearHeading">Whole year groups</h3>
+      <p class="muted small">Pick one sport per year group. Everyone in that year gets it, unless a class below does something different.</p>
+      <div id="yearSportList" style="margin-top:10px"></div>
     </div>
 
     <div class="card pad" style="margin-top:14px">
-      <h3>Student access</h3>
-      <p class="muted small">Nothing is editable by students until you switch it on here. Switch it off again to lock their answers.</p>
-      <div class="toolbar" style="margin-top:12px">
-        <label class="field"><span>Sport</span><select id="acSport"></select></label>
-        <button class="btn sm" id="btnAllT1">Test 1: all on</button>
-        <button class="btn sm" id="btnAllFinal">Final test: all on</button>
-        <button class="btn sm danger" id="btnAllOff">Lock everything</button>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px">
+        <h3>Classes doing something different</h3>
+        <button class="btn sm" id="btnAddOverride">+ Give a class a different sport</button>
       </div>
-      <div class="tablewrap" id="accessTable"></div>
+      <div id="overrideForm" class="hide" style="margin-top:10px">
+        <div class="toolbar">
+          <label class="field"><span>Class</span><select id="ovClass"></select></label>
+          <label class="field"><span>Sport</span><input id="ovSport" list="sportOptions" placeholder="Pick or type"><datalist id="sportOptions"></datalist></label>
+          <button class="btn primary sm" id="btnSaveOverride">Save</button>
+        </div>
+      </div>
+      <div id="overrideList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card pad" style="margin-top:14px">
+      <h3>This term, at a glance</h3>
+      <p class="muted small">Nothing is editable by students until you switch it on. Switch it off again to lock their answers.</p>
+      <div class="tablewrap" id="accessTable" style="margin-top:10px"></div>
       <details class="help">
         <summary>Import programme from CSV</summary>
         <pre>year_group,class_name,sport,term   (leave class_name empty for the whole year)</pre>
@@ -1368,7 +1389,9 @@ async function loadLeaderboard(){
   const cls = S.user.class_name, term = S.settings.currentTerm || '';
   if (DB.mode === 'supabase'){
     const { data, error } = await DB.sb.rpc('aa_leaderboard', { p_class: cls, p_code: L.code || '', p_term: term });
-    return error ? [] : data;
+    if (error) return [];
+    // the function returns out_id / out_name to avoid clashing with column names
+    return (data || []).map(r => ({ id: r.out_id, full_name: r.out_name, hp_term: r.hp_term, hp_year: r.hp_year }));
   }
   const students = classStudents(cls);
   const allAwards = DB._ls(T.awards);
@@ -2062,66 +2085,121 @@ $('#btnDeleteGrid').onclick = async () => {
 /* ---------- programme ---------- */
 function renderProgramme(){
   $('#sportOptions').innerHTML = uniq(S.grids.map(g => g.sport)).map(sp => `<option value="${esc(sp)}">`).join('');
-  $('#setTerm').value = S.settings.currentTerm || 'Term 1';
-  const years = uniq(S.students.map(s => +s.year_group)).sort();
-  const classes = uniq(S.students.map(s => s.class_name)).sort();
-  const cur = $('#pScope').value;
-  $('#pScope').innerHTML = years.map(y => `<option value="Y${y}">Year ${y} — all classes</option>`).join('')
-    + classes.map(c => `<option value="C${c}">${esc(c)} only</option>`).join('');
-  if (cur) $('#pScope').value = cur;
-  const now = S.settings.currentTerm || '';
-  const rows = S.programme.slice().sort((a,b) => (a.year_group - b.year_group)
-    || String(a.class_name||'').localeCompare(String(b.class_name||''))
-    || String(a.term||'').localeCompare(String(b.term||'')));
-  $('#progTable').innerHTML = `<table><thead><tr><th>Applies to</th><th>Term</th><th>Sport</th><th>Grid</th>
-    <th class="noprint"></th></tr></thead><tbody>
-    ${rows.map(p => {
-      const live = (p.term||'') === now;
-      return `<tr>
-      <td class="namecell">${esc(p.class_name ? p.class_name : 'Year ' + p.year_group + ' (all)')}</td>
-      <td class="tiny">${esc(p.term||'')} ${live ? '<span class="chip open">now</span>' : ''}</td>
-      <td>${esc(p.sport)}</td>
-      <td class="tiny">${gridFor(p.sport, p.year_group) ? esc(gridFor(p.sport, p.year_group).title) : '<span class="muted">no grid</span>'}</td>
-      <td class="noprint"><button class="btn sm danger" data-del="${p.id}">Remove</button></td></tr>`;
-    }).join('')}
-    </tbody></table>`;
-  $$('#progTable [data-del]').forEach(b => b.onclick = async () => {
-    await DB.remove(T.programme, { id: isNaN(+b.dataset.del) ? b.dataset.del : +b.dataset.del });
-    S.programme = await DB.select(T.programme); renderProgramme(); fillClassSelects();
-  });
+  renderTermTabs();
+  renderYearSports();
+  renderOverrides();
   renderAccess();
 }
+function renderTermTabs(){
+  const now = S.settings.currentTerm || 'Term 1';
+  $('#termTabs').innerHTML = ['Term 1','Term 2','Term 3'].map(t =>
+    `<button aria-selected="${t === now}" data-term="${t}">${t}</button>`).join('');
+  $$('#termTabs button').forEach(b => b.onclick = async () => {
+    S.settings = { ...S.settings, currentTerm: b.dataset.term };
+    await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
+    renderProgramme();
+  });
+}
+function yearSportRows(year){
+  const now = S.settings.currentTerm || '';
+  return S.programme.filter(p => +p.year_group === +year && !p.class_name && (p.term||'') === now);
+}
+function chipRow(rows, addAttr, addId, onAdd){
+  const used = rows.map(r => r.sport);
+  const remaining = uniq(S.grids.map(g => g.sport)).sort().filter(sp => !used.includes(sp));
+  return `<div class="chiprow">
+    ${rows.map(r => `<span class="sportchip">${esc(r.sport)}<button type="button" data-rmrow="${r.id}">&times;</button></span>`).join('')}
+    ${remaining.length ? `<select class="addsport" ${addAttr}="${addId}"><option value="">+ add a sport</option>${remaining.map(sp => `<option>${esc(sp)}</option>`).join('')}</select>` : ''}
+  </div>`;
+}
+function renderYearSports(){
+  const years = uniq(S.classes.map(c => +c.year_group)).sort((a,b)=>a-b);
+  const now = S.settings.currentTerm || '';
+  $('#yearSportList').innerHTML = years.map(y => {
+    const rows = yearSportRows(y);
+    return `<div class="yearrow"><span class="ylabel">Year ${y}</span>${chipRow(rows, 'data-addyear', y)}</div>`;
+  }).join('') || '<p class="muted small">No classes yet \u2014 add them in Setup.</p>';
+  $$('#yearSportList [data-rmrow]').forEach(b => b.onclick = async () => {
+    await DB.remove(T.programme, { id: isNaN(+b.dataset.rmrow) ? b.dataset.rmrow : +b.dataset.rmrow });
+    S.programme = await DB.select(T.programme);
+    renderYearSports(); renderOverrides(); renderAccess(); fillClassSelects();
+  });
+  $$('#yearSportList [data-addyear]').forEach(sel => sel.onchange = async () => {
+    const year = +sel.dataset.addyear, sport = sel.value; if (!sport) return;
+    await DB.upsert(T.programme, [{ year_group: year, class_name: '', sport, term: now, sort: 0 }], ['year_group','class_name','sport','term']);
+    S.programme = await DB.select(T.programme);
+    renderYearSports(); renderOverrides(); renderAccess(); fillClassSelects();
+  });
+}
+function overrideRows(cls){
+  const now = S.settings.currentTerm || '';
+  return S.programme.filter(p => p.class_name === cls && (p.term||'') === now);
+}
+function renderOverrides(){
+  const now = S.settings.currentTerm || '';
+  const classesWithOverrides = uniq(S.programme.filter(p => p.class_name && (p.term||'') === now).map(p => p.class_name)).sort();
+  $('#overrideList').innerHTML = !classesWithOverrides.length ? '<p class="muted small">No class is doing anything different this term.</p>'
+    : classesWithOverrides.map(cls => `<div class="ovrow">
+        <span class="namecell">${esc(cls)}</span>${chipRow(overrideRows(cls), 'data-addov', cls)}
+      </div>`).join('');
+  $$('#overrideList [data-rmrow]').forEach(b => b.onclick = async () => {
+    await DB.remove(T.programme, { id: isNaN(+b.dataset.rmrow) ? b.dataset.rmrow : +b.dataset.rmrow });
+    S.programme = await DB.select(T.programme);
+    renderOverrides(); renderAccess(); fillClassSelects();
+  });
+  $$('#overrideList [data-addov]').forEach(sel => sel.onchange = async () => {
+    const cls = sel.dataset.addov, sport = sel.value; if (!sport) return;
+    const year = (S.classes.find(c => c.class_name === cls) || {}).year_group || 7;
+    await DB.upsert(T.programme, [{ year_group: year, class_name: cls, sport, term: now, sort: 0 }], ['year_group','class_name','sport','term']);
+    S.programme = await DB.select(T.programme);
+    renderOverrides(); renderAccess(); fillClassSelects();
+  });
+}
+$('#btnAddOverride').onclick = async () => {
+  await ensureClasses();
+  const classes = S.classes.slice().sort((a,b) => a.class_name.localeCompare(b.class_name));
+  $('#ovClass').innerHTML = classes.map(c => `<option>${esc(c.class_name)}</option>`).join('');
+  $('#overrideForm').classList.toggle('hide');
+};
+$('#btnSaveOverride').onclick = async () => {
+  const cls = $('#ovClass').value, sport = $('#ovSport').value.trim(); if (!cls || !sport) return;
+  const now = S.settings.currentTerm || '';
+  const year = (S.classes.find(c => c.class_name === cls) || {}).year_group || 7;
+  await DB.upsert(T.programme, [{ year_group: year, class_name: cls, sport, term: now, sort: 0 }], ['year_group','class_name','sport','term']);
+  S.programme = await DB.select(T.programme);
+  $('#ovSport').value = ''; $('#overrideForm').classList.add('hide');
+  renderOverrides(); renderAccess(); fillClassSelects();
+};
 
-/* ---------- per-class ON/OFF ---------- */
-function classesDoing(sport){
-  return uniq(S.students.map(s => s.class_name)).filter(Boolean).sort()
-    .filter(c => progFor(c, (S.students.find(s => s.class_name === c)||{}).year_group).some(p => p.sport === sport));
+/* ---------- this term, at a glance: every class + its effective sport ---------- */
+function classesThisTerm(){
+  const now = S.settings.currentTerm || '';
+  const out = [];
+  S.classes.forEach(c => {
+    progFor(c.class_name, c.year_group).filter(p => (p.term||'') === now)
+      .forEach(p => out.push({ cls: c.class_name, year: c.year_group, sport: p.sport }));
+  });
+  return out.sort((a,b) => a.cls.localeCompare(b.cls) || a.sport.localeCompare(b.sport));
 }
 function renderAccess(){
-  const now = S.settings.currentTerm || '';
-  const sports = uniq(S.programme.filter(p => (p.term||'') === now).map(p => p.sport)).sort();
-  const cur = $('#acSport').value;
-  $('#acSport').innerHTML = sports.map(sp => `<option>${esc(sp)}</option>`).join('') || '<option value="">nothing in this term</option>';
-  if (sports.includes(cur)) $('#acSport').value = cur;
-  const sport = $('#acSport').value;
-  const list = sport ? classesDoing(sport) : [];
-  $('#accessTable').innerHTML = !list.length ? '<p class="muted small">No class is doing this sport in the current term.</p>'
-    : `<table><thead><tr><th>Class</th><th class="num">Students</th><th>Test 1 (lesson 1)</th><th>Final test (last lesson)</th><th class="num">Done</th></tr></thead><tbody>
-      ${list.map(c => {
-        const a = accessOf(c, sport) || {};
-        const g = gridFor(sport, (S.students.find(s => s.class_name === c)||{}).year_group);
-        const kids = classStudents(c);
+  const list = classesThisTerm();
+  $('#accessTable').innerHTML = !list.length ? '<p class="muted small">Nothing assigned yet this term \u2014 pick a sport for each year group above.</p>'
+    : `<table><thead><tr><th>Class</th><th>Sport</th><th class="num">Students</th><th>Test 1</th><th>Final Test</th><th class="num">Done</th></tr></thead><tbody>
+      ${list.map(({ cls, year, sport }) => {
+        const a = accessOf(cls, sport) || {};
+        const g = gridFor(sport, year);
+        const kids = classStudents(cls);
         const done = ph => g ? kids.filter(k => phaseDone(k.id, g.id, ph)).length : 0;
-        return `<tr><td class="namecell">${esc(c)}</td><td class="num">${kids.length}</td>
-          <td><button type="button" class="tswitch" role="switch" aria-checked="${!!a.test1_open}" data-ac="${esc(c)}" data-ph="test1_open"></button></td>
-          <td><button type="button" class="tswitch" role="switch" aria-checked="${!!a.final_open}" data-ac="${esc(c)}" data-ph="final_open"></button></td>
+        return `<tr><td class="namecell">${esc(cls)}</td><td>${esc(sport)}</td><td class="num">${kids.length}</td>
+          <td><button type="button" class="tswitch" role="switch" aria-checked="${!!a.test1_open}" data-ac="${esc(cls)}" data-sp="${esc(sport)}" data-ph="test1_open"></button></td>
+          <td><button type="button" class="tswitch" role="switch" aria-checked="${!!a.final_open}" data-ac="${esc(cls)}" data-sp="${esc(sport)}" data-ph="final_open"></button></td>
           <td class="num tiny">${done('self1')} / ${done('self2')}</td></tr>`;
       }).join('')}</tbody></table>
-      <p class="tiny muted" style="margin:10px 0 0">Done = how many have saved Test 1 / the Final test.</p>`;
+      <p class="tiny muted" style="margin:10px 0 0">Done = how many have saved Test 1 / the Final Test.</p>`;
   $$('#accessTable [data-ac]').forEach(b => b.onclick = () => {
     const on = b.getAttribute('aria-checked') !== 'true';
     b.setAttribute('aria-checked', String(on));
-    setAccess(b.dataset.ac, sport, { [b.dataset.ph]: on });
+    setAccess(b.dataset.ac, b.dataset.sp, { [b.dataset.ph]: on });
   });
 }
 async function setAccess(cls, sport, patch){
@@ -2130,30 +2208,6 @@ async function setAccess(cls, sport, patch){
     test1_open: a ? a.test1_open : false, final_open: a ? a.final_open : false, ...patch }], ['class_name','sport']);
   S.access = await DB.select(T.access);
 }
-async function setAllAccess(patch){
-  const sport = $('#acSport').value; if (!sport) return;
-  for (const c of classesDoing(sport)) await setAccess(c, sport, patch);
-  renderAccess();
-}
-$('#acSport').onchange = renderAccess;
-$('#btnAllT1').onclick = () => setAllAccess({ test1_open: true });
-$('#btnAllFinal').onclick = () => setAllAccess({ final_open: true });
-$('#btnAllOff').onclick = () => setAllAccess({ test1_open: false, final_open: false });
-$('#setTerm').onchange = async () => {
-  S.settings = { ...S.settings, currentTerm: $('#setTerm').value };
-  await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
-  renderProgramme();
-};
-$('#btnAddProg').onclick = async () => {
-  const sport = $('#pSport').value.trim(); if (!sport) return;
-  const scope = $('#pScope').value;
-  const cls = scope[0] === 'C' ? scope.slice(1) : '';
-  const year = cls ? (S.students.find(s => s.class_name === cls)||{}).year_group : +scope.slice(1);
-  await DB.upsert(T.programme, [{ year_group: +year, class_name: cls, sport, term: $('#pTerm').value, sort: S.programme.length }],
-    ['year_group','class_name','sport','term']);
-  S.programme = await DB.select(T.programme); $('#pSport').value = '';
-  renderProgramme(); fillClassSelects();
-};
 
 /* ---------- students ---------- */
 function renderStudents(){
@@ -2453,14 +2507,13 @@ function renderSettings(){
   const s = S.settings;
   $('#setL1').value = s.l1; $('#setL2').value = s.l2; $('#setL3').value = s.l3; $('#setL4').value = s.l4;
   $('#setSelfBonus').value = s.selfBonus; $('#setProgBonus').value = s.progBonus; $('#setHonesty').value = s.honesty; $('#setWd').value = s.hpPerWd;
-  $('#setTerm').value = s.currentTerm || 'Term 1';
   $('#modeLine').textContent = DB.mode === 'supabase' ? 'Connected to Supabase.' : 'Demo mode: everything is stored in this browser only. Add your Supabase URL and key at the top of the file to go live.';
   $('#btnResetDemo').classList.toggle('hide', DB.mode === 'supabase');
 }
 $('#btnSaveSettings').onclick = async () => {
-  S.settings = { l1:+$('#setL1').value, l2:+$('#setL2').value, l3:+$('#setL3').value, l4:+$('#setL4').value,
+  S.settings = { ...S.settings, l1:+$('#setL1').value, l2:+$('#setL2').value, l3:+$('#setL3').value, l4:+$('#setL4').value,
     selfBonus:+$('#setSelfBonus').value, progBonus:+$('#setProgBonus').value, honesty:+$('#setHonesty').value,
-    hpPerWd: Math.max(1, +$('#setWd').value), currentTerm: $('#setTerm').value };
+    hpPerWd: Math.max(1, +$('#setWd').value) };
   await DB.upsert(T.settings, [{ id:1, data: S.settings }], ['id']);
   msg('#setMsg', 'Settings saved.', 'ok');
 };
@@ -2571,6 +2624,7 @@ $('#btnImportStudents').onclick = async () => {
     if (!rows.length) throw new Error('No usable rows. Check the header line.');
     await DB.upsert(T.students, rows, ['code']);
     S.students = await DB.select(T.students);
+    await ensureClasses();
     fillClassSelects(); renderStudents();
     msg('#studentMsg', `${rows.length} students imported.`, 'ok');
   } catch (e){ msg('#studentMsg', e.message, 'err'); }
