@@ -377,7 +377,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
 
   <!-- marks -->
   <div id="t-marks">
-    <p class="muted small noprint" style="margin:0 0 12px">Give each student a level 1&ndash;4 on every skill: T1 first lesson, T2 mid unit, T3 last lesson.</p>
+    <p class="muted small noprint" style="margin:0 0 12px">Your own marks, level 1&ndash;4 on every skill: <b>Test 1</b> in lesson 1, <b>Final Test</b> in the last lesson.</p>
     <div class="toolbar">
       <label class="field"><span>Class</span><select id="mClass"></select></label>
       <label class="field"><span>Sport</span><select id="mSport"></select></label>
@@ -388,15 +388,15 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
     <div class="card" style="padding:12px">
       <div class="tablewrap" id="marksTable"></div>
       <p class="tiny muted" style="margin:10px 0 0">
-        S1 / S2 = student self-assessment (lesson 1, final). T1 / T2 / T3 = your marks (first, mid, final).
-        <b>Gap</b> = how far the student's final self-assessment sits from your final mark, across the 5 skills.
+        <b>self</b> = what the student put. <b>mine</b> = your mark. <b>Progress</b> = levels gained between your Test 1 and your Final Test.
+        <b>Gap</b> = how far the student's Final Test self-assessment sits from your Final Test mark, per skill.
       </p>
     </div>
   </div>
 
   <!-- awards -->
   <div id="t-awards" class="hide">
-    <p class="muted small noprint" style="margin:0 0 12px">Turns your <b>T3 marks</b> into house points, then into Well Done points. Nothing shows here until T3 is filled in.</p>
+    <p class="muted small noprint" style="margin:0 0 12px">House points come from the <b>Final Test</b> only. Test 1 is the starting point, and improving between the two earns a bonus.</p>
     <div class="toolbar">
       <label class="field"><span>Class</span><select id="aClass"></select></label>
       <label class="field"><span>Sport</span><select id="aSport"></select></label>
@@ -545,10 +545,8 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <div id="studentMsg"></div>
       </details>
     </div>
-  </div>
 
-  <div>
-    <div class="card pad">
+    <div class="card pad" style="margin-top:14px">
       <h3>Points</h3>
       <p class="muted small">What each level is worth in your final mark, and how house points convert.</p>
       <div class="setgrid" style="margin-top:12px">
@@ -562,7 +560,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <summary>Bonus house points</summary>
         <div class="setgrid" style="margin-top:10px">
           <label class="field"><span>Per self-assessment completed</span><input type="number" id="setSelfBonus" min="0"></label>
-          <label class="field"><span>Per level gained (T1 &rarr; T3)</span><input type="number" id="setProgBonus" min="0"></label>
+          <label class="field"><span>Per level gained (Test 1 &rarr; Final)</span><input type="number" id="setProgBonus" min="0"></label>
           <label class="field"><span>Honest self-assessment bonus</span><input type="number" id="setHonesty" min="0"></label>
         </div>
         <p class="tiny muted">Set any of these to 0 to switch it off.</p>
@@ -601,7 +599,8 @@ const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const show = id => { $$('main > section').forEach(x => x.classList.add('hide')); $(id).classList.remove('hide'); window.scrollTo(0,0); };
 const msg = (box, text, kind='info') => { const b=$(box); b.innerHTML = text ? `<div class="notice ${kind}">${esc(text)}</div>` : ''; };
 const uniq = a => Array.from(new Set(a));
-const PHASES = { self1:'Lesson 1 (student)', self2:'Final lesson (student)', t1:'First lesson (teacher)', t2:'Mid unit (teacher)', t3:'Final lesson (teacher)' };
+const PHASES = { self1:'Test 1 — student', self2:'Final Test — student', t1:'Test 1 — teacher', t3:'Final Test — teacher' };
+const PH_SHORT = { self1:'Test 1', self2:'Final Test', t1:'Test 1', t3:'Final Test' };
 const HOUSE_COLOR = h => /red/i.test(h)?'var(--h-red)':/yellow/i.test(h)?'var(--h-yellow)':/green/i.test(h)?'var(--h-green)':/blue/i.test(h)?'var(--h-blue)':'#9AA5A0';
 const MEM = {};
 const LS_OK = (() => { try { localStorage.setItem('aa::probe','1'); localStorage.removeItem('aa::probe'); return true; } catch { return false; } })();
@@ -1316,8 +1315,8 @@ function renderLadders(){
   sk.forEach(k => { const m = markOf(S.user.id, g.id, S.phase, k.idx); if (m) S.draft[k.idx] = m.level; });
 
   msg('#phaseMsg',
-    open ? (saved ? 'Saved. You can still change it.' : `Tap the description that sounds most like you, for each of the ${sk.length} skills. It saves on its own.`)
-         : (saved ? 'Saved and locked. T1, T2 and T3 are your teacher\'s marks.' : 'Your teacher has not opened this one yet. Have a read \u2014 you can fill it in when they do.'),
+    open ? (saved ? 'Saved. You can still change it while it stays open.' : `Tap the description that sounds most like you, for each of the ${sk.length} skills. It saves on its own.`)
+         : (saved ? 'Saved and locked. T1 and FT are your teacher\'s marks for Test 1 and the Final Test.' : 'Your teacher has not opened this one yet. Have a read \u2014 you can fill it in when they do.'),
     open && saved ? 'ok' : 'info');
 
   $('#ladders').innerHTML = sk.map(k => `<div class="skill">
@@ -1325,7 +1324,7 @@ function renderLadders(){
         <span><b>${esc(k.name)}</b><br><span class="muted small">${esc(k.criteria || '')}</span></span></div>
       <div class="rungs" data-idx="${k.idx}">
         ${[1,2,3,4].map(l => {
-          const t = saved ? ['t1','t2','t3'].filter(p => (markOf(S.user.id, g.id, p, k.idx)||{}).level === l).map(p => p.toUpperCase()).join(' ') : '';
+          const t = saved ? ['t1','t3'].filter(p => (markOf(S.user.id, g.id, p, k.idx)||{}).level === l).map(p => p === 't1' ? 'T1' : 'FT').join(' ') : '';
           return `<button class="rung lv${l}" data-l="${l}" aria-pressed="${S.draft[k.idx] === l}" ${open ? '' : 'disabled'}>
             <span class="lvl">${l} · ${LEVEL_NAME[l]}</span><span class="txt">${esc(k['d'+l] || '')}</span>
             ${t ? `<span class="tmark">${t}</span>` : ''}</button>`;
@@ -1438,24 +1437,28 @@ async function renderMarks(){
   const sk = skillsOf(g.id), kids = classStudents(cls);
   const tabs = `<p class="tiny muted noprint" style="margin:0 0 8px">Marking against: <b>${esc(g.title || g.sport)}</b></p>`
     + `<div class="tabs noprint" style="max-width:520px; margin-bottom:12px">
-    ${[['overview','Overview'],['t1','Enter T1'],['t2','Enter T2'],['t3','Enter T3']].map(([k,l]) =>
+    ${[['overview','Overview'],['t1','Enter Test 1'],['t3','Enter Final Test']].map(([k,l]) =>
       `<button data-p="${k}" aria-selected="${marksPhase===k}">${l}</button>`).join('')}</div>`;
 
   let table;
   if (marksPhase === 'overview'){
     const tot = (sid, ph) => { const v = sk.map(s => (markOf(sid, g.id, ph, s.idx)||{}).level).filter(Boolean); return v.length ? v.reduce((a,b)=>a+b,0) : null; };
-    table = `<table><thead><tr><th>Student</th><th>House</th>
-      <th class="num">S1</th><th class="num">T1</th><th class="num">T2</th><th class="num">S2</th><th class="num">T3</th>
-      <th class="num">Gap</th><th class="num">Points</th></tr></thead><tbody>
+    table = `<table><thead><tr><th rowspan="2">Student</th><th rowspan="2">House</th>
+      <th class="num" colspan="2">Test 1</th><th class="num" colspan="2">Final Test</th>
+      <th class="num" rowspan="2">Progress</th><th class="num" rowspan="2">Gap</th><th class="num" rowspan="2">Points</th></tr>
+      <tr><th class="num">self</th><th class="num">mine</th><th class="num">self</th><th class="num">mine</th></tr></thead><tbody>
       ${kids.map(k => {
         const gap = sk.map(s => { const a = (markOf(k.id,g.id,'self2',s.idx)||{}).level, b = (markOf(k.id,g.id,'t3',s.idx)||{}).level; return (a&&b) ? Math.abs(a-b) : null; }).filter(x => x !== null);
         const gv = gap.length ? (gap.reduce((a,b)=>a+b,0)/gap.length) : null;
         const gc = gv === null ? '' : gv <= 0.5 ? 'gap0' : gv <= 1 ? 'gap1' : 'gap2';
         const pts = sk.map(s => (markOf(k.id,g.id,'t3',s.idx)||{}).level).filter(Boolean).reduce((n,l) => n + lvlPoints(l), 0);
         const cell = v => `<td class="num">${v ?? '·'}</td>`;
+        const a = tot(k.id,'t1'), b = tot(k.id,'t3');
+        const prog = (a !== null && b !== null) ? b - a : null;
         return `<tr><td class="namecell">${esc(k.full_name)}</td>
           <td class="tiny"><span class="house-dot" style="background:${HOUSE_COLOR(k.house)}"></span>${esc(k.house)}</td>
-          ${cell(tot(k.id,'self1'))}${cell(tot(k.id,'t1'))}${cell(tot(k.id,'t2'))}${cell(tot(k.id,'self2'))}${cell(tot(k.id,'t3'))}
+          ${cell(tot(k.id,'self1'))}${cell(a)}${cell(tot(k.id,'self2'))}${cell(b)}
+          <td class="num ${prog > 0 ? 'gap0' : ''}">${prog === null ? '·' : (prog > 0 ? '+' + prog : prog)}</td>
           <td class="num ${gc}">${gv === null ? '·' : gv.toFixed(1)}</td>
           <td class="num">${pts || '·'}</td></tr>`;
       }).join('')}</tbody></table>`;
@@ -1476,8 +1479,8 @@ async function renderMarks(){
       }).join('')}</tbody>
       <tfoot><tr><th>Class average</th>${sk.map(x => `<th class="num">${avg(x.idx)}</th>`).join('')}<th></th></tr></tfoot></table>`;
   }
-  const from = { t2:'t1', t3:'t2' }[marksPhase];
-  const copyBtn = from ? `<button class="btn sm noprint" id="btnCopyPhase" style="margin-bottom:12px">Start from ${from.toUpperCase()} marks</button>` : '';
+  const from = { t3:'t1' }[marksPhase];
+  const copyBtn = from ? `<button class="btn sm noprint" id="btnCopyPhase" style="margin-bottom:12px">Start from the Test 1 marks</button>` : '';
   $('#marksTable').innerHTML = tabs + copyBtn + `<div class="tablewrap">${table}</div>`;
   if (from) $('#btnCopyPhase').onclick = async () => {
     const rows = [];
@@ -1486,7 +1489,7 @@ async function renderMarks(){
       if (src && !(markOf(k.id, g.id, marksPhase, x.idx)||{}).level)
         rows.push({ student_id: k.id, grid_id: g.id, phase: marksPhase, skill_idx: x.idx, level: src });
     }));
-    if (!rows.length) return alert(`Nothing to copy — every ${marksPhase.toUpperCase()} box already has a mark, or ${from.toUpperCase()} is empty.`);
+    if (!rows.length) return alert('Nothing to copy — every Final Test box already has a mark, or Test 1 is empty.');
     await DB.upsert(T.marks, rows, ['student_id','grid_id','phase','skill_idx']);
     await loadMarks(g.id, kids.map(k => k.id));
     renderMarks();
@@ -1511,7 +1514,7 @@ $('#btnExportMarks').onclick = () => {
   const sk = skillsOf(g.id);
   const head = ['code','name','class','phase', ...sk.map(s => `s${s.idx}`), 'total'];
   const rows = [];
-  classStudents(cls).forEach(k => ['self1','t1','t2','self2','t3'].forEach(ph => {
+  classStudents(cls).forEach(k => ['self1','t1','self2','t3'].forEach(ph => {
     const v = sk.map(s => (markOf(k.id,g.id,ph,s.idx)||{}).level || '');
     if (v.some(x => x !== '')) rows.push([k.code, k.full_name, cls, ph, ...v, v.filter(Boolean).reduce((a,b)=>a+b,0)]);
   }));
@@ -1534,12 +1537,12 @@ async function renderAwards(){
   const g = gridFor(sport, (S.students.find(s => s.class_name === cls)||{}).year_group);
   const ids = classStudents(cls).map(k => k.id);
   await loadMarks((g||{}).id, ids); await loadAwards((g||{}).id, ids);
-  $('#awardRule').textContent = `Final teacher mark: L1=${S.settings.l1}, L2=${S.settings.l2}, L3=${S.settings.l3}, L4=${S.settings.l4}. Bonuses: ${S.settings.selfBonus} per self-assessment completed, ${S.settings.progBonus} per level gained from T1 to T3, ${S.settings.honesty} when all five self-marks land within one level of yours. ${S.settings.hpPerWd} house points = 1 Well Done point; the remainder carries to the next sport.`;
+  $('#awardRule').textContent = `Your Final Test mark pays: level 1 = ${S.settings.l1}, level 2 = ${S.settings.l2}, level 3 = ${S.settings.l3}, level 4 = ${S.settings.l4}. Bonuses: ${S.settings.selfBonus} for each self-assessment completed, ${S.settings.progBonus} per level gained between your Test 1 and Final Test marks, ${S.settings.honesty} when every self-mark lands within one level of yours. ${S.settings.hpPerWd} house points = 1 Well Done point; the remainder carries to the next sport.`;
   if (!g){ $('#awardTable').innerHTML = '<p class="muted">No grid for this sport yet.</p>'; return; }
   const sk = skillsOf(g.id), kids = classStudents(cls);
   const issued = a => S.awards.find(x => x.student_id === a && x.grid_id === g.id);
   $('#awardTable').innerHTML = `<table><thead><tr>
-    <th>Student</th><th>House</th><th class="num">Final</th><th class="num">Self</th><th class="num">Progress</th><th class="num">Honesty</th>
+    <th>Student</th><th>House</th><th class="num">Final Test</th><th class="num">Self</th><th class="num">Progress</th><th class="num">Honesty</th>
     <th class="num">House pts</th><th class="num">Carry in</th><th class="num">Well Done</th><th class="num">Carry out</th><th>Status</th></tr></thead><tbody>
     ${kids.map(k => {
       const done = issued(k.id);
