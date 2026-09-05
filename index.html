@@ -443,7 +443,6 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
       <button class="btn primary sm" id="btnIssue">Issue points to class</button>
     </div>
     <div id="awardMsg"></div>
-    <div id="houseBoard" style="margin-top:12px"></div>
     <div class="printhead"><h2 id="mPrintTitle"></h2><span class="mono small" id="mPrintDate"></span></div>
     <div class="card" style="padding:12px">
       <div class="tablewrap" id="marksTable"></div>
@@ -453,6 +452,8 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         A <span style="color:var(--gold); font-weight:700">gold</span> strip on a level button in Enter Test 1 / Enter Final Test shows what the student picked for themselves.
       </p>
     </div>
+    <p class="muted small noprint" style="margin:18px 0 0">House points are a motivation layer on top of the assessment above, not the point of it.</p>
+    <div id="houseBoard" class="noprint" style="margin-top:8px"></div>
   </div>
 
   <!-- grids -->
@@ -1606,7 +1607,10 @@ function classStudents(cls){
 /* ---------- class marks ---------- */
 let marksPhase = 'overview';
 async function ensureAllAwards(){
-  S.allAwards = await DB.select(T.awards);
+  const allIds = S.students.map(s => s.id);
+  if (!allIds.length){ S.allAwards = []; return; }
+  try { S.allAwards = await DB.select(T.awards, { student_id: allIds }); }
+  catch (e){ S.allAwards = S.allAwards || []; msg('#awardMsg', 'Could not load school-wide house points: ' + e.message, 'err'); }
 }
 function houseTotals(students){
   const houses = uniq(S.students.map(s => s.house)).filter(Boolean).sort();
