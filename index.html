@@ -135,6 +135,32 @@ body.busy-net #busybar.done{ width:100%; transition:width .2s ease; }
 .ovrow{ display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line) }
 .ovrow:first-child{ border-top:0 }
 .ovrow .namecell{ width:90px; flex:none }
+
+/* ---------- student leaderboard ---------- */
+.mystand{ display:flex; align-items:center; gap:18px; flex-wrap:wrap }
+.mystand-rank{
+  font-family:var(--display); font-weight:800; font-size:2.6rem; line-height:1;
+  color:var(--l4); display:flex; align-items:baseline; gap:3px;
+}
+.mystand-hash{ font-size:1.3rem; opacity:.5 }
+.mystand-of{ font-family:var(--body); font-size:.8rem; font-weight:600; color:var(--muted); margin-left:6px }
+.mystand-pts{ display:flex; gap:22px; margin-left:auto }
+.mystand-pts div{ display:flex; flex-direction:column; align-items:flex-end }
+.mystand-pts b{ font-family:var(--display); font-size:1.35rem; line-height:1.1; color:var(--ink) }
+.mystand-pts span{ font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em }
+.lbrow{ display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:9px; font-size:.92rem }
+.lbrow.me{ background:#E9F3ED }
+.lbrank{ width:22px; flex:none; text-align:center; font-family:var(--mono); font-size:.85rem; color:var(--muted) }
+.lbrow.me .lbrank{ color:var(--l4); font-weight:700 }
+.lbname{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.lbrow.me .lbname{ font-weight:700; color:var(--l4) }
+.lbyou{ font-size:.66rem; font-weight:700; background:var(--l4); color:#fff; padding:1px 6px; border-radius:999px; vertical-align:1px }
+.lbbar{ width:34%; max-width:150px; height:7px; background:#EDF0EC; border-radius:99px; overflow:hidden; flex:none }
+.lbbar i{ display:block; height:100%; background:var(--l2); border-radius:99px }
+.lbrow.me .lbbar i{ background:var(--l3) }
+.lbpts{ width:42px; flex:none; text-align:right; font-family:var(--mono); font-weight:600; font-size:.88rem }
+.lbgap{ text-align:center; color:var(--muted); letter-spacing:2px; padding:2px 0 }
+@media (max-width:520px){ .lbbar{ display:none } .mystand-pts{ gap:16px } }
 /* ---------- login pickers ---------- */
 .pickgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px}
 .pickgrid.tall{grid-template-columns:1fr; max-height:46vh; overflow-y:auto; gap:6px}
@@ -1410,14 +1436,33 @@ async function renderLeaderboard(){
   const idx = rows.findIndex(r => r.id === S.user.id);
   const me = idx >= 0 ? rows[idx] : null;
   if (me){ S.myTotals = me; $('#sKpi') && renderStudentKpi(); }
+  const top = rows[0] ? rows[0].hp_year : 0;
+  const medal = i => i === 0 ? '\u{1F947}' : i === 1 ? '\u{1F948}' : i === 2 ? '\u{1F949}' : '';
+  // Always show the top 5, and if the student is further down, show their own
+  // row too so they never have to scroll or count to find themselves.
+  const shown = rows.slice(0, 5);
+  const meOutside = me && idx >= 5;
+  const rowHtml = (r, i) => {
+    const isMe = r.id === S.user.id;
+    const pct = top > 0 ? Math.max(4, Math.round((r.hp_year / top) * 100)) : 0;
+    return `<div class="lbrow ${isMe ? 'me' : ''}">
+      <span class="lbrank">${medal(i) || (i+1)}</span>
+      <span class="lbname">${esc(r.full_name)}${isMe ? ' <span class="lbyou">you</span>' : ''}</span>
+      <span class="lbbar"><i style="width:${pct}%"></i></span>
+      <span class="lbpts">${r.hp_year}</span>
+    </div>`;
+  };
   $('#leaderboard').innerHTML = `<div class="card pad" style="margin-bottom:16px">
-    <span class="eyebrow">Your class</span>
-    ${me ? `<div class="cmp"><span>Your rank</span><span>#${idx+1} of ${rows.length}</span></div>
-      <div class="cmp"><span>House points this term</span><span class="pill hp">${me.hp_term}</span></div>
-      <div class="cmp"><span>House points all year</span><span class="pill hp">${me.hp_year}</span></div>` : ''}
-    <div style="border-top:1px solid var(--line); margin-top:10px; padding-top:8px">
-      ${rows.slice(0,5).map((r,i) => `<div class="cmp ${r.id===S.user.id?'gap0':''}"><span>${i+1}. ${esc(r.full_name)}</span><span class="mono">${r.hp_year}</span></div>`).join('')}
-    </div>
+    ${me ? `<div class="mystand">
+        <div class="mystand-rank"><span class="mystand-hash">#</span>${idx+1}<span class="mystand-of">of ${rows.length}</span></div>
+        <div class="mystand-pts">
+          <div><b>${me.hp_term}</b><span>this term</span></div>
+          <div><b>${me.hp_year}</b><span>all year</span></div>
+        </div>
+      </div>` : ''}
+    <span class="eyebrow" style="display:block; margin:14px 0 8px">Top of your class</span>
+    ${shown.map(rowHtml).join('')}
+    ${meOutside ? `<div class="lbgap">\u22EF</div>${rowHtml(me, idx)}` : ''}
   </div>`;
 }
 function renderStudentKpi(){
