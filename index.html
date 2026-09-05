@@ -533,6 +533,7 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
         <button class="btn sm" id="btnResetPins">Clear PINs for this class</button>
         <button class="btn sm" id="btnExportStudents">Export CSV</button>
         <button class="btn sm" id="btnSlips">Print login slips</button>
+        <button class="btn sm danger" id="btnDelClassStudents">Remove all students in this class</button>
       </div>
       <div class="tablewrap" id="studentTable"></div>
       <details class="help">
@@ -573,6 +574,16 @@ label.inline{display:inline-flex; align-items:center; gap:6px; cursor:pointer}
       <h3>Data</h3>
       <p class="muted small" id="modeLine"></p>
       <div class="btnrow"><button class="btn sm danger" id="btnResetDemo">Reset demo data</button></div>
+
+      <hr style="border:0; border-top:1px solid var(--line); margin:18px 0">
+      <h3 style="color:var(--warn)">Danger zone</h3>
+      <p class="muted small">These act on everyone at once and cannot be undone. Each asks you to type a word to confirm.</p>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn sm danger" id="btnDelAllClasses">Delete every class</button>
+        <button class="btn sm danger" id="btnDelAllStudents">Delete every student</button>
+        <button class="btn sm danger" id="btnDelEverything">Delete everything (full reset)</button>
+      </div>
+      <div id="dangerMsg"></div>
     </div>
   </div>
 </section>
@@ -681,7 +692,9 @@ const DB = {
   async remove(table, match){
     if (this.mode === 'supabase'){
       let q = this.sb.from(table).delete();
-      for (const k in match) q = q.eq(k, match[k]);
+      const keys = Object.keys(match || {});
+      if (keys.length) for (const k of keys) q = q.eq(k, match[k]);
+      else q = q.not('id', 'is', null);  // delete every row; Postgres requires an explicit filter
       const { error } = await q; if (error) throw error; return;
     }
     const keep = this._ls(table).filter(r => !Object.keys(match).every(k => r[k] === match[k]));
@@ -1409,7 +1422,7 @@ function switchTab(t){
   ({ marks:renderMarks, awards:renderAwards, grids:renderGridEditor, programme:renderProgramme, setup:renderSetup }[t])();
 }
 function fillClassSelects(){
-  const classes = uniq(S.students.map(s => s.class_name)).sort();
+  const classes = uniq([...S.classes.map(c => c.class_name), ...S.students.map(s => s.class_name)]).filter(Boolean).sort();
   ['#mClass','#aClass','#stClass'].forEach(sel => {
     const cur = $(sel).value;
     $(sel).innerHTML = classes.map(c => `<option>${esc(c)}</option>`).join('');
@@ -1423,7 +1436,8 @@ function fillClassSelects(){
 function rerender(){ const t = $('#tnav button[aria-selected="true"]').dataset.t; ({ marks:renderMarks, awards:renderAwards }[t] || (()=>{}))(); }
 function fillSportSelect(clsSel, sportSel){
   const cls = $(clsSel).value;
-  const yr = (S.students.find(s => s.class_name === cls) || {}).year_group;
+  const yr = (S.students.find(s => s.class_name === cls) || {}).year_group
+    || (S.classes.find(c => c.class_name === cls) || {}).year_group;
   const sports = uniq(progFor(cls, yr).map(p => p.sport));
   const cur = $(sportSel).value;
   $(sportSel).innerHTML = sports.map(s => `<option>${esc(s)}</option>`).join('') || '<option value="">No sports</option>';
@@ -2215,6 +2229,67 @@ $('#btnSaveSettings').onclick = async () => {
   msg('#setMsg', 'Settings saved.', 'ok');
 };
 $('#btnResetDemo').onclick = () => { if (confirm('Wipe the demo data and start again?')) { seedDemo(true); location.reload(); } };
+
+/* ---------- deletion controls ---------- */
+function typeToConfirm(word, question){
+  const typed = prompt(`${question}\n\nType ${word} to confirm.`);
+  return typed !== null && typed.trim().toUpperCase() === word.toUpperCase();
+}
+async function wipeClass(cls){
+  await DB.remove(T.students, { class_name: cls });
+  await DB.remove(T.memberships, { class_name: cls });
+  await DB.remove(T.access, { class_name: cls });
+  await DB.remove(T.programme, { class_name: cls });
+}
+async function refreshAfterWipe(){
+  S.students = await DB.select(T.students, null, '*');
+  S.memberships = await DB.select(T.memberships);
+  S.classes = await DB.select(T.classes);
+  S.access = await DB.select(T.access);
+  S.programme = await DB.select(T.programme);
+  fillClassSelects(); renderClasses(); renderStudents();
+}
+
+$('#btnDelClassStudents').onclick = async () => {
+  const cls = $('#stClass').value; if (!cls) return;
+  const n = classStudents(cls).length;
+  if (!n) return msg('#studentMsg', `${cls} has no students.`, 'info');
+  if (!typeToConfirm('REMOVE', `Remove all ${n} students in ${cls}, and their marks and points? The class itself and its code stay.`)) return;
+  await DB.remove(T.students, { class_name: cls });
+  await DB.remove(T.memberships, { class_name: cls });
+  await refreshAfterWipe();
+  msg('#studentMsg', `${cls} is now empty.`, 'ok');
+};
+
+$('#btnDelAllClasses').onclick = async () => {
+  const n = S.classes.length;
+  if (!n) return msg('#dangerMsg', 'No classes to delete.', 'info');
+  if (!typeToConfirm('DELETE', `Delete all ${n} classes and every student in them, with their marks and points? This does not touch grids, the programme, or teacher accounts.`)) return;
+  for (const c of S.classes) await wipeClass(c.class_name);
+  for (const c of S.classes) await DB.remove(T.classes, { class_name: c.class_name });
+  await refreshAfterWipe();
+  msg('#dangerMsg', 'Every class and student has been removed.', 'ok');
+};
+
+$('#btnDelAllStudents').onclick = async () => {
+  const n = S.students.length;
+  if (!n) return msg('#dangerMsg', 'No students to delete.', 'info');
+  if (!typeToConfirm('DELETE', `Delete all ${n} students, everywhere, with their marks and points? Classes and their codes stay, ready to re-import.`)) return;
+  await DB.remove(T.students, {});
+  await DB.remove(T.memberships, {});
+  await refreshAfterWipe();
+  msg('#dangerMsg', 'Every student has been removed. Classes and codes are unchanged.', 'ok');
+};
+
+$('#btnDelEverything').onclick = async () => {
+  if (!typeToConfirm('RESET', 'Delete every class, student, grid, mark, award and programme entry, and start completely empty? Teacher accounts are kept so you are not locked out.')) return;
+  for (const t of [T.students, T.memberships, T.access, T.programme, T.marks, T.awards, T.skills, T.grids]) await DB.remove(t, {});
+  for (const c of S.classes) await DB.remove(T.classes, { class_name: c.class_name });
+  await DB.upsert(T.settings, [{ id:1, data: DEFAULT_SETTINGS }], ['id']);
+  await loadCore();
+  fillClassSelects(); renderClasses(); renderStudents(); fillGridSelect(); renderGridEditor(); renderProgramme(); renderSettings();
+  msg('#dangerMsg', 'Everything has been reset. Start again from Grids \u2192 Load standard sports.', 'ok');
+};
 
 /* ============================================================
    CSV
